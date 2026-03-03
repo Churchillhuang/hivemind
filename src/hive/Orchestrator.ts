@@ -1,13 +1,22 @@
 /**
- * Orchestrator - 任务路由和 Agent 生命周期管理
+ * Orchestrator - 任务路由和 Agent 生命周期管理 (混合路由)
  *
  * 使用 L0 记忆（零记忆），专注于路由决策
+ *
+ * 路由模式：
+ * 1. 直接路由 (Direct Routing) - 用于系统级核心功能（腦幹）
+ *    - 反射式、快速、预定义规则
+ *    - 示例：memory_query → MemoryAgent
+ * 2. 协商路由 (Negotiation Routing) - 用于功能级复杂任务（大脑皮层）
+ *    - 动态协商、性能优化
+ *    - 示例：file_analysis → 投标选择最优
  */
 
 import { BaseAgent } from '../core/Agent.js';
 import { Event, EventType } from '../events/Event.js';
 import { EventBus } from '../events/EventBus.js';
-import type { HiveConfig } from '../hive/HiveConfig.js';
+import type { HiveConfig } from './HiveConfig.js';
+import { NegotiationRouter } from './NegotiationRouter.js';
 
 /**
  * Task - 待处理任务
@@ -51,6 +60,7 @@ export interface RoutingDecision {
   taskId: string;
   targetAgent: string;
   reasoning: string;
+  routingMode: 'direct' | 'negotiated';  // 新增：路由模式
   newAgent?: {
     type: 'system' | 'functional';
     role: string;
@@ -58,16 +68,27 @@ export interface RoutingDecision {
   };
 }
 
+/**
+ * 路由模式定义
+ */
+enum RoutingMode {
+  DIRECT = 'direct',       // 硬编码规则，快速、反射式
+  NEGOTIATED = 'negotiated',  // 协商路由，动态、优化
+}
+
 export class Orchestrator extends BaseAgent {
   private hiveConfig: HiveConfig;
   private taskQueue: Map<string, Task> = new Map();
   private agents: Map<string, AgentInfo> = new Map();
   private routingRules: Map<string, string[]> = new Map(); // 规则 -> agent IDs
+  private directRoutingTasks: Set<string>;  // 使用直接路由的任务类型
+  private negotiationRouter?: NegotiationRouter;  // 协商路由器
 
   constructor(
     config: { id: string; role: string; description?: string },
     hiveConfig: HiveConfig,
     eventBus?: EventBus,
+    negotiationRouter?: NegotiationRouter,
   ) {
     super({
       id: config.id,
@@ -77,22 +98,63 @@ export class Orchestrator extends BaseAgent {
     }, eventBus);
 
     this.hiveConfig = hiveConfig;
+    this.negotiationRouter = negotiationRouter;
+    this.directRoutingTasks = new Set();
+
     this.initializeRoutingRules();
+    this.initializeDirectRoutingTasks();
   }
 
   /**
    * 初始化路由规则
    */
   private initializeRoutingRules(): void {
-    // 系统级 Agents 的固定路由
+    // 系统级 Agents 的固定路由（直接路由 - 像腦幹）
     this.routingRules.set('message', ['interface_agent_001']);
     this.routingRules.set('memory_query', ['memory_agent_001']);
     this.routingRules.set('reflection', ['reflection_agent_001']);
 
-    // 功能级 Agents 的动态路由（示例）
+    // 功能级 Agents（如果已预定义，也用直接路由）
     this.routingRules.set('moltbook_post', ['moltbook_bot']);
     this.routingRules.set('wordpress_upload', ['wp_uploader']);
     this.routingRules.set('file_analysis', ['file_analyzer']);
+  }
+
+  /**
+   * 初始化直接路由任务类型
+   * 这些是核心/底层功能，不需要协商
+   */
+  private initializeDirectRoutingTasks(): void {
+    // 系统核心功能 - 必须快速、直接
+    this.directRoutingTasks.add('message');           // 用户消息处理
+    this.directRoutingTasks.add('memory_query');      // 记忆查询
+    this.directRoutingTasks.add('reflection');        // 反思
+
+    // 如果你需要某些预定义功能也用直接路由，可以添加：
+    // this.directRoutingTasks.add('moltbook_post');
+  }
+
+  /**
+   * 判断使用哪种路由模式
+   */
+  private getRoutingMode(taskType: string): RoutingMode {
+    if (this.directRoutingTasks.has(taskType)) {
+      return RoutingMode.DIRECT;
+    }
+
+    // 其他任务类型使用协商路由
+    return RoutingMode.NEGOTIATED;
+  }
+
+  /**
+   * 创建协商路由器（如果没有）
+   */
+  private ensureNegotiationRouter(): void {
+    if (!this.negotiationRouter) {
+      this.negotiationRouter = new NegotiationRouter(this.hiveConfig, this.eventBus);
+      this.negotiationRouter.start();
+      console.log(`[Orchestrator ${this.id}] NegotiationRouter initialized`);
+    }
   }
 
   async start(): Promise<void> {
@@ -138,6 +200,12 @@ export class Orchestrator extends BaseAgent {
     this.subscribeTo(EventType.AGENT_STOPPED);
     this.subscribeTo(EventType.MESSAGE_PROCESSED);
 
+    // 订阅协商路由事件
+    if (this.negotiationRouter) {
+      this.subscribeTo('TASK_ASSIGNED');
+      this.subscribeTo('TASK_NEGOTIATION_FAILED');
+    }
+
     await this.eventBus?.publish({
       type: EventType.AGENT_STARTED,
       sourceAgent: this.id,
@@ -145,10 +213,11 @@ export class Orchestrator extends BaseAgent {
         agentId: this.id,
         role: this.role,
         rules: Array.from(this.routingRules.keys()),
+        directRoutingTasks: Array.from(this.directRoutingTasks),
       },
     });
 
-    console.log(`[Orchestrator ${this.id}] Started`);
+    console.log(`[Orchestrator ${this.id}] Started with hybrid routing`);
   }
 
   async stop(): Promise<void> {
@@ -157,6 +226,10 @@ export class Orchestrator extends BaseAgent {
     }
 
     this.running = false;
+
+    if (this.negotiationRouter) {
+      this.negotiationRouter.stop();
+    }
 
     await this.eventBus?.publish({
       type: EventType.AGENT_STOPPED,
@@ -191,128 +264,215 @@ export class Orchestrator extends BaseAgent {
       case EventType.MESSAGE_PROCESSED:
         await this.handleMessageProcessed(event);
         break;
+
+      case 'TASK_ASSIGNED':
+        await this.handleTaskAssigned(event);
+        break;
+
+      case 'TASK_NEGOTIATION_FAILED':
+        await this.handleNegotiationFailed(event);
+        break;
+    }
+  }
+
+  /**
+   * 处理任务分配（协商路由）
+   */
+  private async handleTaskAssigned(event: Event): Promise<void> {
+    const assignment = event.payload as {
+      taskId: string;
+      assignedTo: string;
+      bidScore: number;
+    };
+
+    // 查找任务并更新状态
+    const task = this.taskQueue.get(assignment.taskId);
+    if (task) {
+      task.assignedAgent = assignment.assignedTo;
+      task.status = 'Processing';
+
+      await this.eventBus?.publish({
+        type: EventType.TASK_ASSIGNED,
+        sourceAgent: this.id,
+        payload: {
+          taskId: task.id,
+          assignedTo: assignment.assignedTo,
+        },
+      });
+    }
+
+    console.log(`[Orchestrator ${this.id}] Task negotiated and assigned: ${assignment.taskId} → ${assignment.assignedTo}`);
+  }
+
+  /**
+   * 处理协商失败
+   */
+  private async handleNegotiationFailed(event: Event): Promise<void> {
+    const payload = event.payload as {
+      taskId: string;
+      reason: string;
+      announcement: any;
+    };
+
+    // 记录失败，可以尝试降级到直接路由
+    console.error(`[Orchestrator ${this.id}] Negotiation failed for task ${payload.taskId}: ${payload.reason}`);
+
+    const task = this.taskQueue.get(payload.taskId);
+    if (task) {
+      task.status = 'failed';
+      task.error = `Negotiation failed: ${payload.reason}`;
     }
   }
 
   /**
    * 处理新消息
    */
-  private async handleNewMessage(event: Event): Promise<void> {
-    const message = event.payload as {
-      id: string;
-      content: string;
-      userId?: string;
-      channelId?: string;
-    };
-
-    console.log(`[Orchestrator ${this.id}] Routing message: ${message.content}`);
-
-    // 创建任务
+  async handleNewMessage(event: Event): Promise<void> {
     const task: Task = {
       id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type: 'message',
       priority: 'medium',
       sourceAgent: event.sourceAgent,
-      payload: message,
+      payload: event.payload,
       createdAt: Date.now(),
       status: 'pending',
     };
 
-    // 添加到队列
     this.taskQueue.set(task.id, task);
 
-    // 路由决策
-    const decision = this.routeTask(task);
-
-    console.log(`[Orchestrator ${this.id}] Routing decision:`, decision);
-
-    // 执行路由
-    if (decision.newAgent) {
-      await this.createAgent(decision.newAgent);
-    }
-
-    // 分配任务
-    task.assignedAgent = decision.targetAgent;
-    task.status = 'Processing';
-
-    // 发布任务分配事件
-    await this.eventBus?.publish({
-      type: 'TASK_ASSIGNED',
-      sourceAgent: this.id,
-      payload: {
-        taskId: task.id,
-        targetAgent: decision.targetAgent,
-        task: task,
-      },
-    });
+    // 混合路由决策
+    const decision = this.makeRoutingDecision(task);
+    await this.executeRoutingDecision(decision);
   }
 
   /**
    * 处理任务请求
    */
-  private async handleTaskRequest(event: Event): Promise<void> {
-    const task = event.payload as Task;
+  async handleTaskRequest(event: Event): Promise<void> {
+    const task: Task = {
+      id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: 'action',
+      priority: 'medium',
+      sourceAgent: event.sourceAgent,
+      payload: event.payload,
+      createdAt: Date.now(),
+      status: 'pending',
+    };
 
-    console.log(`[Orchestrator ${this.id}] Task requested:`, task);
+    this.taskQueue.set(task.id, task);
 
-    // 路由决策
-    const decision = this.routeTask(task);
-
-    // 执行路由
-    if (decision.newAgent) {
-      await this.createAgent(decision.newAgent);
-    }
-
-    // 分配任务
-    task.assignedAgent = decision.targetAgent;
-    task.status = 'Processing';
-
-    // 发布任务分配事件
-    await this.eventBus?.publish({
-      type: 'TASK_ASSIGNED',
-      sourceAgent: this.id,
-      payload: {
-        taskId: task.id,
-        targetAgent: decision.targetAgent,
-        task: task,
-      },
-    });
+    // 混合路由决策
+    const decision = this.makeRoutingDecision(task);
+    await this.executeRoutingDecision(decision);
   }
 
   /**
-   * 路由决策 - 简单规则引擎
+   * 混合路由决策
    */
-  private routeTask(task: Task): RoutingDecision {
-    // MVP: 基于规则的简单路由
-    // 后期可以扩展为基于 ML 或启发式算法
+  private makeRoutingDecision(task: Task): RoutingDecision {
+    const taskType = task.payload.taskType || task.type as string;
+    const routingMode = this.getRoutingMode(taskType);
 
-    // 消息类型 -> interface_agent
-    if (task.type === 'message') {
-      const targetAgents = this.routingRules.get('message') || [];
-      return {
-        taskId: task.id,
-        targetAgent: targetAgents[0] || 'interface_agent_001',
-        reasoning: 'Message routing to InterfaceAgent',
-      };
+    if (routingMode === RoutingMode.DIRECT) {
+      // 直接路由：使用预定义规则（像腦幹-反射）
+      return this.makeDirectRoutingDecision(task, taskType);
+    } else {
+      // 协商路由：使用 NegotiationRouter（像大脑皮层-思考）
+      return this.makeNegotiatedRoutingDecision(task, taskType);
     }
+  }
 
-    // 记忆查询 -> memory_agent
-    if (task.payload.query && task.sourceAgent !== 'memory_agent_001') {
-      const targetAgents = this.routingRules.get('memory_query') || [];
+  /**
+   * 直接路由决策（腦幹模式 - 快速、反射）
+   */
+  private makeDirectRoutingDecision(task: Task, taskType: string): RoutingDecision {
+    // 查找预定义的路由规则
+    const targetAgents = this.routingRules.get(taskType);
+
+    if (targetAgents && targetAgents.length > 0) {
+      const targetAgent = targetAgents[0];
+
       return {
         taskId: task.id,
-        targetAgent: targetAgents[0] || 'memory_agent_001',
-        reasoning: 'Memory query routing to MemoryAgent',
+        targetAgent,
+        reasoning: `Direct routing: ${taskType} → ${targetAgent} (brainstem reflex)`,
+        routingMode: 'direct',
       };
     }
 
     // 默认: interface_agent
-    const targetAgents = this.routingRules.get('message') || [];
+    const defaultTarget = this.routingRules.get('message')?.[0] || 'interface_agent_001';
     return {
       taskId: task.id,
-      targetAgent: targetAgents[0] || 'interface_agent_001',
-      reasoning: 'Default routing to InterfaceAgent',
+      targetAgent: defaultTarget,
+      reasoning: `Default direct routing → ${defaultTarget}`,
+      routingMode: 'direct',
     };
+  }
+
+  /**
+   * 协商路由决策（大脑皮层模式 - 动态协商）
+   */
+  private makeNegotiatedRoutingDecision(task: Task, taskType: string): RoutingDecision {
+    // 确保协商路由器初始化
+    this.ensureNegotiationRouter();
+
+    // 构建任务公告
+    const announcement = {
+      taskId: task.id,
+      taskType,
+      requiredCapabilities: task.payload.requiredCapabilities || [],
+      priority: task.priority,
+      description: task.payload.description || taskType,
+      timestamp: Date.now(),
+    };
+
+    // 公告任务，让 agents 投标
+    if (this.negotiationRouter) {
+      this.negotiationRouter.announceTask(announcement);
+
+      console.log(`[Orchestrator ${this.id}] Task announced for negotiation: ${task.id} (${taskType})`);
+    }
+
+    // 任务最终通过 TASK_ASSIGNED 事件回调处理
+    return {
+      taskId: task.id,
+      targetAgent: 'pending_negotiation',  // 临时值，待协商完成
+      reasoning: `Task announced for negotiation (cortex coordination)`,
+      routingMode: 'negotiated',
+    };
+  }
+
+  /**
+   * 执行路由决策
+   */
+  private async executeRoutingDecision(decision: RoutingDecision): Promise<void> {
+    // 协商模式不需要立即执行（等待 TASK_ASSIGNED 事件）
+    if (decision.routingMode === 'negotiated') {
+      console.log(`[Orchestrator ${this.id}] Waiting for negotiation completion...`);
+      return;
+    }
+
+    // 直接模式：立即执行路由
+    const task = this.taskQueue.get(decision.taskId);
+    if (!task) {
+      console.error(`[Orchestrator ${this.id}] Task not found: ${decision.taskId}`);
+      return;
+    }
+
+    task.assignedAgent = decision.targetAgent;
+    task.status = 'Processing';
+
+    await this.eventBus?.publish({
+      type: EventType.TASK_ASSIGNED,
+      sourceAgent: this.id,
+      payload: {
+        taskId: task.id,
+        assignedTo: decision.targetAgent,
+      },
+    });
+
+    console.log(`[Orchestrator ${this.id}] Direct routing: ${task.id} → ${decision.targetAgent} (${decision.reasoning})`);
   }
 
   /**
@@ -399,34 +559,15 @@ export class Orchestrator extends BaseAgent {
     // 更新 Agent 统计
     const agent = this.agents.get(response.agentId);
     if (agent) {
-      agent.stats.tasksCompleted++;
-    }
-
-    // 标记任务完成
-    for (const [taskId, task] of this.taskQueue.entries()) {
-      if (task.assignedAgent === response.agentId && task.status === 'Processing') {
-        task.status = 'completed';
-        task.result = response;
-        console.log(`[Orchestrator ${this.id}] Task ${taskId} completed`);
-        break;
-      }
+      agent.stats.tasksCompleted += 1;
     }
   }
 
   /**
    * 注册 Agent
    */
-  registerAgent(agent: AgentInfo): void {
-    this.agents.set(agent.id, agent);
-    console.log(`[Orchestrator ${this.id}] Agent registered: ${agent.id} (${agent.role})`);
-  }
-
-  /**
-   * 注销 Agent
-   */
-  unregisterAgent(agentId: string): void {
-    this.agents.delete(agentId);
-    console.log(`[Orchestrator ${this.id}] Agent unregistered: ${agentId}`);
+  registerAgent(agentInfo: AgentInfo): void {
+    this.agents.set(agentInfo.id, agentInfo);
   }
 
   /**
@@ -437,10 +578,21 @@ export class Orchestrator extends BaseAgent {
   }
 
   /**
-   * 获取所有 Agents
+   * 添加路由规则
    */
-  getAllAgents(): AgentInfo[] {
-    return Array.from(this.agents.values());
+  addRoutingRule(taskType: string, agentIds: string[]): void {
+    this.routingRules.set(taskType, agentIds);
+  }
+
+  /**
+   * 设置直接路由任务类型
+   */
+  setDirectRoutingTask(taskType: string, isDirect: boolean = true): void {
+    if (isDirect) {
+      this.directRoutingTasks.add(taskType);
+    } else {
+      this.directRoutingTasks.delete(taskType);
+    }
   }
 
   /**
@@ -448,38 +600,24 @@ export class Orchestrator extends BaseAgent {
    */
   getQueueStatus(): {
     totalTasks: number;
-    byStatus: Record<string, number>;
-    byAgent: Record<string, number>;
+    pendingTasks: number;
+    processingTasks: number;
   } {
-    const byStatus: Record<string, number> = {};
-    const byAgent: Record<string, number> = {};
+    let pending = 0;
+    let processing = 0;
 
     for (const task of this.taskQueue.values()) {
-      byStatus[task.status] = (byStatus[task.status] || 0) + 1;
-      if (task.assignedAgent) {
-        byAgent[task.assignedAgent] = (byAgent[task.assignedAgent] || 0) + 1;
+      if (task.status === 'pending') {
+        pending += 1;
+      } else if (task.status === 'Processing') {
+        processing += 1;
       }
     }
 
     return {
       totalTasks: this.taskQueue.size,
-      byStatus,
-      byAgent,
-    };
-  }
-
-  /**
-   * 获取 Orchestrator 状态
-   */
-  getStatus(): {
-    agents: number;
-    tasks: number;
-    rules: string[];
-  } {
-    return {
-      agents: this.agents.size,
-      tasks: this.taskQueue.size,
-      rules: Array.from(this.routingRules.keys()),
+      pendingTasks: pending,
+      processingTasks: processing,
     };
   }
 }
