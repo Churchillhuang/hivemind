@@ -82,9 +82,12 @@ export class MemoryGateway extends BaseAgent {
   private writeQueue: Map<string, QueuedWrite> = new Map();
   private isProcessing: Map<string, boolean> = new Map();
   private readCache: Map<string, { content: string; timestamp: number }> = new Map();
+  private cleanupInterval?: NodeJS.Timeout;
 
   // Cache expiration (5 seconds)
   private readonly CACHE_TTL = 5000;
+  // Cleanup interval (60 seconds)
+  private readonly CLEANUP_INTERVAL = 60000;
   // Max retries for failed writes
   private readonly MAX_RETRIES = 3;
   // Retry delay (exponential backoff base)
@@ -116,13 +119,18 @@ export class MemoryGateway extends BaseAgent {
     this.subscribeTo('MEMORY_WRITE_REQUEST');
     this.subscribeTo('MEMORY_READ_REQUEST');
 
+    // Start periodic cache cleanup
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredCache();
+    }, this.CLEANUP_INTERVAL);
+
     await this.eventBus?.publish({
       type: EventType.AGENT_STARTED,
       sourceAgent: this.id,
       payload: {
         agentId: this.id,
         role: this.role,
-        cacheSize: 0,
+        cacheSize: this.readCache.size,
         queueSize: 0,
       },
     });
@@ -136,6 +144,12 @@ export class MemoryGateway extends BaseAgent {
     }
 
     this.running = false;
+
+    // Stop periodic cleanup
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
 
     // Process remaining writes before stopping
     await this.flushQueue();
@@ -476,6 +490,26 @@ export class MemoryGateway extends BaseAgent {
       this.readCache.delete(file);
     } else {
       this.readCache.clear();
+    }
+  }
+
+  /**
+   * Cleanup expired cache entries
+   */
+  private cleanupExpiredCache(): void {
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [key, value] of this.readCache.entries()) {
+      // Remove entries older than 2x TTL (stale cache)
+      if (now - value.timestamp > this.CACHE_TTL * 2) {
+        this.readCache.delete(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`[MemoryGateway ${this.id}] Cleaned ${cleaned} expired cache entries`);
     }
   }
 

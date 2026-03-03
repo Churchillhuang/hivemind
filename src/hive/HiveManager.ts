@@ -180,30 +180,37 @@ export class HiveManager {
 
     console.log('[HiveManager] Shutting down HiveMind...');
 
-    // Stop in reverse order
+    // Stop in reverse order, using destroy() to ensure proper cleanup
     const stopPromises: Promise<void>[] = [];
 
     if (this.reflectionAgent) {
-      stopPromises.push(this.reflectionAgent.stop());
+      stopPromises.push(this.reflectionAgent.destroy());
     }
 
     if (this.interfaceAgent) {
-      stopPromises.push(this.interfaceAgent.stop());
+      stopPromises.push(this.interfaceAgent.destroy());
     }
 
     if (this.memoryAgent) {
-      stopPromises.push(this.memoryAgent.stop());
+      stopPromises.push(this.memoryAgent.destroy());
     }
 
     if (this.orchestrator) {
-      stopPromises.push(this.orchestrator.stop());
+      stopPromises.push(this.orchestrator.destroy());
     }
 
     if (this.memoryGateway) {
-      stopPromises.push(this.memoryGateway.stop());
+      stopPromises.push(this.memoryGateway.destroy());
     }
 
     await Promise.all(stopPromises);
+
+    // Clear agent references
+    this.reflectionAgent = undefined;
+    this.interfaceAgent = undefined;
+    this.memoryAgent = undefined;
+    this.orchestrator = undefined;
+    this.memoryGateway = undefined;
 
     this.initialized = false;
 
