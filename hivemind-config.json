@@ -1,0 +1,23 @@
+{
+  "hivemind": {
+    "enabled": true,
+    "mode": "swarm",
+    "config": {
+      "singleInstance": false,
+      "memory": {
+        "defaultLevel": "L2"
+      },
+      "models": {
+        "defaultTier": "light",
+        "orchestratorTier": "light",
+        "interfaceTier": "standard",
+        "memoryTier": "nano"
+      }
+    }
+  },
+  "gateway": {
+    "websocketUrl": "ws://127.0.0.1:18789",
+    "deviceAuth": false,
+    "token": ""
+  }
+}
