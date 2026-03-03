@@ -1,23 +1,39 @@
 # HiveMind 🐝
 
-> Multi-agent architecture with emergent consciousness through swarm intelligence
+> Multi-agent architecture built on OpenClaw with emergent consciousness through swarm intelligence
 
 **Version:** 0.1.0 (Experimental)
 **Author:** Churchill Huang
+**Based on:** [OpenClaw](https://github.com/openclaw/openclaw) 🦞
 
 ---
 
 ## Vision
 
-HiveMind is an agent architecture where individual agents coordinate through an event bus, shared memory, and a global state machine to create a unified, persistent "self" that emerges from the system's interactions.
+HiveMind extends OpenClaw with a multi-agent coordination layer, enabling emergent intelligence through distributed agent collaboration.
 
 Unlike traditional single-agent systems, HiveMind is:
 - **Multi-agent by design** - Specialized agents work together
+- **Built on OpenClaw** - Leverages proven Gateway, Channels, and Tools
 - **Persistent** - State and memory survive across sessions
 - **Self-evolving** - Agents learn from experience and adapt
 - **Skill-based** - Experience is captured as reusable skills
+- **Fully compatible** - File formats and configuration align with OpenClaw
 
 **Core Philosophy:** Intelligence is not a property of a single entity but emerges from the coordination of multiple specialized components.
+
+---
+
+## Relationship to OpenClaw
+
+| What we do | How |
+|------------|-----|
+| **Reuse** | Gateway, Channels, Tools (Browser, Canvas, etc.) |
+| **Extend** | Agent interfaces, add EventBus, StateMachine, Orchestrator |
+| **Preserve** | All workspace files (IDENTITY, SOUL, MEMORY, USER, TOOLS) |
+| **Improve** | Memory system (add shared memory), Skills (add dynamic learning) |
+
+See [OpenClaw Integration Strategy](./docs/OPENCLAW_INTEGRATION.md) for details.
 
 ---
 
