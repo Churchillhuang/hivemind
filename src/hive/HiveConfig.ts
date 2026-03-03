@@ -62,6 +62,7 @@ export interface HiveConfig {
     system: {
       interface: { enabled: boolean };
       memory: { enabled: boolean };
+      memoryGateway: { enabled: boolean };
       orchestrator: { enabled: boolean };
       reflection: { enabled: boolean };
     };
@@ -169,6 +170,7 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
     system: {
       interface: { enabled: true },
       memory: { enabled: true },
+      memoryGateway: { enabled: true },
       orchestrator: { enabled: true },
       reflection: { enabled: true },
     },

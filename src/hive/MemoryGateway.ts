@@ -1,0 +1,491 @@
+/**
+ * MemoryGateway - Memory File I/O Coordinator
+ *
+ * Centralizes all memory file write operations through the EventBus.
+ * Prevents concurrent write conflicts by serializing requests.
+ *
+ * Key features:
+ * - Write queue: Serializes all write operations
+ * - Read cache: Guarantees consistent reads (includes pending writes)
+ * - Atomic writes: Writes to temp file + atomic rename
+ * - Error handling: Retries failed writes with exponential backoff
+ */
+
+import { BaseAgent } from '../core/Agent.js';
+import { Event, EventType } from '../events/Event.js';
+import { EventBus } from '../events/EventBus.js';
+import type { HiveConfig } from '../hive/HiveConfig.js';
+import { promises as fs } from 'fs';
+import path from 'path';
+
+/**
+ * MemoryWriteRequest - Write request payload
+ */
+export interface MemoryWriteRequest {
+  file: string;          // Relative path from workspace root (e.g. "MEMORY.md", "IDENTITY.md")
+  content: string;
+  requestId: string;
+  operation: 'write' | 'append';
+  options?: {
+    atomic?: boolean;    // Use atomic write (default: true)
+    retry?: number;      // Retry count (default: 3)
+  };
+}
+
+/**
+ * MemoryWriteResponse - Write response
+ */
+export interface MemoryWriteResponse {
+  requestId: string;
+  file: string;
+  success: boolean;
+  error?: string;
+  bytesWritten: number;
+  writeTimeMs: number;
+}
+
+/**
+ * MemoryReadRequest - Read request payload
+ */
+export interface MemoryReadRequest {
+  file: string;
+  requestId: string;
+  options?: {
+    fromLine?: number;
+    toLine?: number;
+  };
+}
+
+/**
+ * MemoryReadResponse - Read response
+ */
+export interface MemoryReadResponse {
+  requestId: string;
+  file: string;
+  content: string | null;
+  error?: string;
+  source: 'cache' | 'file' | 'error';
+}
+
+/**
+ * Pending write in queue
+ */
+interface QueuedWrite {
+  request: MemoryWriteRequest;
+  timestamp: number;
+  reject: (reason: unknown) => void;
+  resolve: (value: MemoryWriteResponse) => void;
+}
+
+export class MemoryGateway extends BaseAgent {
+  private hiveConfig: HiveConfig;
+  private writeQueue: Map<string, QueuedWrite> = new Map();
+  private isProcessing: Map<string, boolean> = new Map();
+  private readCache: Map<string, { content: string; timestamp: number }> = new Map();
+
+  // Cache expiration (5 seconds)
+  private readonly CACHE_TTL = 5000;
+  // Max retries for failed writes
+  private readonly MAX_RETRIES = 3;
+  // Retry delay (exponential backoff base)
+  private readonly RETRY_DELAY_BASE = 100;
+
+  constructor(
+    config: { id: string; role: string; description?: string },
+    hiveConfig: HiveConfig,
+    eventBus?: EventBus,
+  ) {
+    super({
+      id: config.id,
+      role: config.role,
+      type: 'system',
+      description: config.description,
+    }, eventBus);
+
+    this.hiveConfig = hiveConfig;
+  }
+
+  async start(): Promise<void> {
+    if (this.running) {
+      return;
+    }
+
+    this.running = true;
+
+    // Subscribe to memory events
+    this.subscribeTo('MEMORY_WRITE_REQUEST');
+    this.subscribeTo('MEMORY_READ_REQUEST');
+
+    await this.eventBus?.publish({
+      type: EventType.AGENT_STARTED,
+      sourceAgent: this.id,
+      payload: {
+        agentId: this.id,
+        role: this.role,
+        cacheSize: 0,
+        queueSize: 0,
+      },
+    });
+
+    console.log(`[MemoryGateway ${this.id}] Started`);
+  }
+
+  async stop(): Promise<void> {
+    if (!this.running) {
+      return;
+    }
+
+    this.running = false;
+
+    // Process remaining writes before stopping
+    await this.flushQueue();
+
+    await this.eventBus?.publish({
+      type: EventType.AGENT_STOPPED,
+      sourceAgent: this.id,
+      payload: {
+        agentId: this.id,
+        role: this.role,
+      },
+    });
+
+    console.log(`[MemoryGateway ${this.id}] Stopped`);
+  }
+
+  async handle(event: Event): Promise<void> {
+    switch (event.type) {
+      case 'MEMORY_WRITE_REQUEST':
+        await this.handleWriteRequest(event);
+        break;
+
+      case 'MEMORY_READ_REQUEST':
+        await this.handleReadRequest(event);
+        break;
+
+      default:
+        console.warn(`[MemoryGateway ${this.id}] Unknown event type: ${event.type}`);
+    }
+  }
+
+  /**
+   * Handle write request
+   */
+  private async handleWriteRequest(event: Event): Promise<void> {
+    const request = event.payload as MemoryWriteRequest;
+
+    console.log(`[MemoryGateway ${this.id}] Write request: ${request.file} (${request.content.length} bytes)`);
+
+    try {
+      // Queue the write
+      const promise = this.queueWrite(request);
+
+      // Wait for it to complete
+      const response = await promise;
+
+      // Publish result
+      await this.eventBus?.publish({
+        type: 'MEMORY_WRITE_RESPONSE',
+        sourceAgent: this.id,
+        payload: response,
+      });
+
+      // Notify about memory update
+      await this.eventBus?.publish({
+        type: EventType.MEMORY_UPDATE,
+        sourceAgent: this.id,
+        payload: {
+          file: request.file,
+          operation: request.operation,
+          bytesWritten: response.bytesWritten,
+        },
+      });
+
+      console.log(`[MemoryGateway ${this.id}] Write completed: ${request.file} (${response.bytesWritten} bytes)`);
+
+    } catch (error) {
+      console.error(`[MemoryGateway ${this.id}] Write failed: ${request.file}`, error);
+
+      await this.eventBus?.publish({
+        type: 'MEMORY_WRITE_RESPONSE',
+        sourceAgent: this.id,
+        payload: {
+          requestId: request.requestId,
+          file: request.file,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+          bytesWritten: 0,
+          writeTimeMs: 0,
+        },
+      });
+    }
+  }
+
+  /**
+   * Queue a write operation and return a promise
+   */
+  private queueWrite(request: MemoryWriteRequest): Promise<MemoryWriteResponse> {
+    // Check if file is already being processed
+    if (this.isProcessing.get(request.file)) {
+      // Wait for current write to complete, then re-queue
+      return new Promise((resolve, reject) => {
+        this.writeQueue.set(request.requestId, {
+          request,
+          timestamp: Date.now(),
+          resolve,
+          reject,
+        });
+      });
+    }
+
+    // Process immediately
+    return this.processWrite(request);
+  }
+
+  /**
+   * Process a write operation with retry logic
+   */
+  private async processWrite(request: MemoryWriteRequest): Promise<MemoryWriteResponse> {
+    const startTime = Date.now();
+
+    // Mark file as processing
+    this.isProcessing.set(request.file, true);
+
+    try {
+      const retryCount = request.options?.retry ?? this.MAX_RETRIES;
+      const atomic = request.options?.atomic ?? true;
+
+      // Try write with retries
+      for (let attempt = 0; attempt <= retryCount; attempt++) {
+        try {
+          if (atomic) {
+            await this.atomicWrite(request.file, request.content, request.operation);
+          } else {
+            await this.directWrite(request.file, request.content, request.operation);
+          }
+
+          // Update cache
+          this.readCache.set(request.file, {
+            content: await this.readFileDirect(request.file),
+            timestamp: Date.now(),
+          });
+
+          const writeTimeMs = Date.now() - startTime;
+
+          return {
+            requestId: request.requestId,
+            file: request.file,
+            success: true,
+            bytesWritten: request.content.length,
+            writeTimeMs,
+          };
+
+        } catch (error) {
+          if (attempt === retryCount) {
+            throw error;
+          }
+
+          // Exponential backoff
+          const delay = this.RETRY_DELAY_BASE * Math.pow(2, attempt);
+          console.warn(`[MemoryGateway ${this.id}] Write attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+
+      // Should not reach here
+      throw new Error('Write failed after retries');
+
+    } finally {
+      // Mark file as not processing
+      this.isProcessing.set(request.file, false);
+
+      // Process next write for this file
+      this.processNextWrite(request.file);
+    }
+  }
+
+  /**
+   * Process next write in queue for a file
+   */
+  private processNextWrite(file: string): void {
+    // Find the next write for this file
+    for (const [requestId, queued] of this.writeQueue.entries()) {
+      if (queued.request.file === file) {
+        this.writeQueue.delete(requestId);
+
+        // Process it
+        this.processWrite(queued.request)
+          .then(queued.resolve)
+          .catch(queued.reject);
+
+        return;
+      }
+    }
+  }
+
+  /**
+   * Atomic write: write to temp file + rename
+   */
+  private async atomicWrite(file: string, content: string, operation: 'write'|'append'): Promise<void> {
+    const workspacePath = this.hiveConfig.memory?.indexing.workspacePath || '';
+    const fullPath = path.join(workspacePath, file);
+
+    if (operation === 'append') {
+      // For append, read existing, append, then atomic write
+      const existing = await this.readFileDirect(file);
+      content = existing + content;
+    }
+
+    // Write to temp file
+    const tmpFile = `${fullPath}.tmp.${Date.now()}.${Math.random().toString(16).slice(2)}`;
+    await fs.writeFile(tmpFile, content, 'utf-8');
+
+    // Atomic rename
+    await fs.rename(tmpFile, fullPath);
+
+    console.log(`[MemoryGateway ${this.id}] Atomic write: ${file}`);
+  }
+
+  /**
+   * Direct write (without atomic rename)
+   */
+  private async directWrite(file: string, content: string, operation: 'write'|'append'): Promise<void> {
+    const workspacePath = this.hiveConfig.memory?.indexing.workspacePath || '';
+    const fullPath = path.join(workspacePath, file);
+
+    if (operation === 'append') {
+      await fs.appendFile(fullPath, content, 'utf-8');
+    } else {
+      await fs.writeFile(fullPath, content, 'utf-8');
+    }
+
+    console.log(`[MemoryGateway ${this.id}] Direct write: ${file}`);
+  }
+
+  /**
+   * Read file directly (no cache)
+   */
+  private async readFileDirect(file: string): Promise<string> {
+    const workspacePath = this.hiveConfig.memory?.indexing.workspacePath || '';
+    const fullPath = path.join(workspacePath, file);
+
+    try {
+      return await fs.readFile(fullPath, 'utf-8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return ''; // File doesn't exist, return empty string
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Handle read request
+   */
+  private async handleReadRequest(event: Event): Promise<void> {
+    const request = event.payload as MemoryReadRequest;
+
+    console.log(`[MemoryGateway ${this.id}] Read request: ${request.file}`);
+
+    try {
+      let content: string | null = null;
+      let source: 'cache' | 'file' | 'error' = 'error';
+
+      // Check cache first
+      try {
+        const cached = this.readCache.get(request.file);
+        if (cached && (Date.now() - cached.timestamp < this.CACHE_TTL)) {
+          content =cached.content;
+          source = 'cache';
+          console.log(`[MemoryGateway ${this.id}] Cache hit: ${request.file}`);
+        }
+      } catch {}
+
+      // Cache miss, read from file
+      if (content === null) {
+        content = await this.readFileDirect(request.file);
+        source = 'file';
+
+        // Update cache
+        this.readCache.set(request.file, {
+          content: content,
+          timestamp: Date.now(),
+        });
+      }
+
+      // Extract lines if requested
+      if (request.options?.fromLine !== undefined) {
+        const lines = content!.split('\n');
+        const from = request.options.fromLine;
+        const to = request.options.toLine ?? lines.length;
+        content = lines.slice(from, to).join('\n');
+      }
+
+      const response: MemoryReadResponse = {
+        requestId: request.requestId,
+        file: request.file,
+        content,
+        source,
+      };
+
+      await this.eventBus?.publish({
+        type: 'MEMORY_READ_RESPONSE',
+        sourceAgent: this.id,
+        payload: response,
+      });
+
+    } catch (error) {
+      console.error(`[MemoryGateway ${this.id}] Read failed: ${request.file}`, error);
+
+      await this.eventBus?.publish({
+        type: 'MEMORY_READ_RESPONSE',
+        sourceAgent: this.id,
+        payload: {
+          requestId: request.requestId,
+          file: request.file,
+          content: null,
+          error: error instanceof Error ? error.message : String(error),
+          source: 'error',
+        },
+      });
+    }
+  }
+
+  /**
+   * Flush all pending writes
+   */
+  private async flushQueue(): Promise<void> {
+    const promises: Promise<void>[] = [];
+
+    for (const queued of this.writeQueue.values()) {
+      promises.push(
+        this.processWrite(queued.request)
+          .then(queued.resolve)
+          .catch(queued.reject)
+      );
+    }
+
+    await Promise.all(promises);
+    this.writeQueue.clear();
+  }
+
+  /**
+   * Clear read cache
+   */
+  clearCache(file?: string): void {
+    if (file) {
+      this.readCache.delete(file);
+    } else {
+      this.readCache.clear();
+    }
+  }
+
+  /**
+   * Get queue status
+   */
+  getQueueStatus(): { queueSize: number; processing: Set<string> } {
+    return {
+      queueSize: this.writeQueue.size,
+      processing: new Set(this.isProcessing.entries().filter(([, v]) => v).map(([k]) => k)),
+    };
+  }
+}
