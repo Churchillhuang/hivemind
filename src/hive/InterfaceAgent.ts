@@ -50,6 +50,7 @@ export class InterfaceAgent extends BaseAgent {
     this.eventBus = eventBus || getGlobalEventBus();
 
     // 订阅事件
+    this.subscribeTo(EventType.NEW_MESSAGE);      // 处理新消息
     this.subscribeTo(EventType.MESSAGE_PROCESSED);
     this.subscribeTo(EventType.MEMORY_RESULT);
     this.subscribeTo(EventType.AGENT_ERROR);
@@ -98,6 +99,11 @@ export class InterfaceAgent extends BaseAgent {
 
   async handle(event: Event): Promise<void> {
     switch (event.type) {
+      case EventType.NEW_MESSAGE:
+        // MVP: InterfaceAgent 处理自己发布的消息
+        await this.handleNewMessage(event);
+        break;
+
       case EventType.MESSAGE_PROCESSED:
         await this.handleMessageProcessed(event);
         break;
@@ -109,6 +115,56 @@ export class InterfaceAgent extends BaseAgent {
       case EventType.AGENT_ERROR:
         await this.handleAgentError(event);
         break;
+    }
+  }
+
+  // Private event handlers
+
+  private async handleNewMessage(event: Event): Promise<void> {
+    const message = event.payload as Message;
+
+    console.log(`[InterfaceAgent ${this.id}] Processing message:`, message);
+
+    try {
+      // 只处理自己发布的消息（避免循环）
+      if (event.sourceAgent !== this.id) {
+        console.log(`[InterfaceAgent ${this.id}] Skipping message from different agent`);
+        return;
+      }
+
+      // 请求记忆（可选）
+      const memory = await this.requestMemory(message.content.substring(0, 50));
+
+      // 生成响应
+      const content = await this.generateResponse(message, memory);
+
+      // 发布响应
+      const response: AgentResponse = {
+        messageId: message.id,
+        content,
+        agentId: this.id,
+        timestamp: Date.now(),
+      };
+
+      await this.eventBus.publish({
+        type: EventType.MESSAGE_PROCESSED,
+        sourceAgent: this.id,
+        payload: response,
+        correlationId: event.correlationId,
+      });
+
+      console.log(`[InterfaceAgent ${this.id}] Response published:`, content);
+    } catch (error) {
+      console.error(`[InterfaceAgent ${this.id}] Error processing message:`, error);
+
+      await this.eventBus.publish({
+        type: EventType.AGENT_ERROR,
+        sourceAgent: this.id,
+        payload: {
+          message: 'Failed to process message',
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
     }
   }
 
