@@ -81,7 +81,7 @@ The system implements tracking for emergent properties:
 
 ### Memory & Model Tiering
 
-**Memory (5 Tiers):** Reduces token usage by providing different memory levels to different agents
+**Memory (5 Tiers):** Optional optimization to reduce token usage by providing different memory levels
 
 | Tier | Content | Used By | Purpose |
 |------|---------|---------|---------|
@@ -91,26 +91,18 @@ The system implements tracking for emergent properties:
 | **L3** | Knowledge | Memory Agent | Full knowledge base (MEMORY.md) |
 | **L4** | Sample | Reflection Agent | Memory samples for self-reflection |
 
-**Mechanism:**
-- Each agent gets only the memory it needs
-- Orchestrator uses L0 for speed
-- Functional agents use L2 to stay focused
-- Reflection uses L4 samples to avoid loading everything
+**Note:** You can use the same memory level for all agents. Tiering is optional optimization.
 
-**Models (4 Tiers):** Right-sized models for different tasks
+**Models (4 Tiers):** Optional optimization to use different models for different tasks
 
-| Tier | Model Size | Used By | Cost | Latency |
-|------|-----------|---------|------|---------|
-| **Nano** | ≤1B | Memory | Lowest | Fastest |
-| **Light** | 3-7B | Orchestrator, Functional (default) | Low | Fast |
-| **Standard** | 8-30B | Interface, Reflection | Medium | Medium |
-| **Heavy** | ≥70B | Complex tasks (if needed) | High | Slow |
+| Tier | Model Size | Use Case | Cost | Latency |
+|------|-----------|----------|------|---------|
+| **Nano** | ≤1B | Simple operations (Memory matching) | Lowest | Fastest |
+| **Light** | 3-7B | Routing, coordination (Orchestrator) | Low | Fast |
+| **Standard** | 8-30B | Dialogue, reflection (Interface, Reflection) | Medium | Medium |
+| **Heavy** | ≥70B | Complex tasks (rarely used) | High | Slow |
 
-**Mechanism:**
-- Orchestrator uses Light models for routing (high volume, low complexity)
-- Interface uses Standard models for quality interaction
-- Memory uses Nano for simple operations
-- Heavy only used for rare complex tasks (not currently used)
+**Note:** You can use the same model for all agents. Tiering is optional - single model works fine.
 
 ---
 
