@@ -29,6 +29,79 @@
 - "Self" is usually assumed to be a designed module
 - But consciousness might emerge from system coordination, not from any single component
 
+### Architectural Philosophy: Command vs Coordination
+
+**OpenClaw: Master-Slave Architecture**
+
+```
+Main Agent - "The Boss"
+    ↓ Command
+Subagent 1, Subagent 2, Subagent 3...
+    ↓ Execute tasks
+├─ Coordinated through main session (vertical commands)
+├─ Main agent is the decision-maker
+├─ Subagents are executors
+└─ Information flow: unidirectional (Main → Sub)
+```
+
+**Characteristics:**
+- Single "boss" (main agent)
+- Vertical command chain
+- Centralized decision-making (main agent decides)
+- Clear hierarchy
+
+**HiveMind: Coordination Architecture**
+
+```
+Interface Agent - "Waiter" (not boss)
+    ↓ Receives user request
+┌────────────────────────────────────┐
+│      EventBus (horizontal)         │
+│  ┌──────┐ ┌──────┐ ┌──────┐       │
+│  │Orc   │ │Mem   │ │Ref   │       │
+│  │hstr  │ │ory   │ │lect  │       │
+│  └──────┘ └──────┘ └──────┘       │
+│   (route)  (memory) (reflect)     │
+│        ↕        ↕        ↕        │
+│  ┌───────────────────────────┐   │
+│  │  Functional Agents        │   │
+│  │  (collaborate, no boss)   │   │
+│  └───────────────────────────┘   │
+└────────────────────────────────────┘
+```
+
+**Characteristics:**
+- No single "boss"
+- Horizontal information flow (EventBus)
+- Distributed decision-making (multiple agents contribute)
+- Collaboration, not command
+
+**Core Differences:**
+
+| Dimension | OpenClaw (Master-Slave) | HiveMind (Coordination) |
+|-----------|------------------------|-------------------------|
+| **Decision-maker** | Main agent | Multiple agents together |
+| **Command flow** | Vertical (Main → Sub) | Horizontal (peer-to-peer) |
+| **Coordination** | Main session commands | EventBus + State Machine |
+| **Interface** | Main agent is "boss" | Interface Agent is "waiter" |
+| **Information flow** | Unidirectional (command) | Bidirectional (negotiation) |
+
+### Why Coordination is Better for Emergence
+
+1. **Command System:**
+   - Boss commands, subordinates execute
+   - Centralized decisions
+   - Harder to produce "unexpected" behaviors → Emergence difficult
+
+2. **Coordination System:**
+   - Multiple peers communicate
+   - Collective decision-making
+   - Can produce "swarm intelligence" → Emergence easier
+
+**Analogies:**
+- **OpenClaw:** Like an army (commander orders, soldiers execute)
+- **HiveMind:** Like a soccer team (11 players coordinate, no single "main brain")
+
 ### Two Approaches to Creating Intelligence
 
 | Approach | Description | Problem |
