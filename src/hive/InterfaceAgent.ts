@@ -126,11 +126,9 @@ export class InterfaceAgent extends BaseAgent {
     console.log(`[InterfaceAgent ${this.id}] Processing message:`, message);
 
     try {
-      // 只处理自己发布的消息（避免循环）
-      if (event.sourceAgent !== this.id) {
-        console.log(`[InterfaceAgent ${this.id}] Skipping message from different agent`);
-        return;
-      }
+      // MVP: 不检查 sourceAgent，让所有消息都能被处理
+      // 这样 Orchestrator 可以路由消息给它
+      // 后期可以添加更智能的循环检测
 
       // 请求记忆（可选）
       const memory = await this.requestMemory(message.content.substring(0, 50));
