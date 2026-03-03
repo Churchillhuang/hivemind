@@ -1,0 +1,219 @@
+/**
+ * Interface Agent - HiveMind 的对话 Agent
+ *
+ * 负责处理用户消息，与 Gateway 交互，通过 EventBus 协调其他 Agents
+ */
+
+import { BaseAgent } from '../core/Agent.js';
+import { Event, EventType } from '../events/Event.js';
+import { EventBus } from '../events/EventBus.js';
+import type { HiveConfig } from '../hive/HiveConfig.js';
+
+export interface Message {
+  id: string;
+  content: string;
+  userId?: string;
+  channelId?: string;
+  timestamp: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentResponse {
+  messageId: string;
+  content: string;
+  agentId: string;
+  timestamp: number;
+  metadata?: Record<string, unknown>;
+}
+
+export class InterfaceAgent extends BaseAgent {
+  private eventBus: EventBus;
+  private pendingRequests: Map<string, {
+    resolve: (value: AgentResponse) => void;
+    reject: (err: Error) => void;
+    timer: NodeJS.Timeout;
+  }> = new Map();
+  private readonly requestTimeout = 30000; // 30 秒超时
+
+  constructor(
+    config: { id: string; role: string; description?: string },
+    hiveConfig: HiveConfig,
+    eventBus?: EventBus,
+  ) {
+    super({
+      id: config.id,
+      role: config.role,
+      type: 'system',
+      description: config.description,
+    }, eventBus);
+
+    this.eventBus = eventBus || getGlobalEventBus();
+
+    // 订阅事件
+    this.subscribeTo(EventType.MESSAGE_PROCESSED);
+    this.subscribeTo(EventType.MEMORY_RESULT);
+    this.subscribeTo(EventType.AGENT_ERROR);
+  }
+
+  async start(): Promise<void> {
+    if (this.running) {
+      return;
+    }
+
+    this.running = true;
+
+    await this.eventBus.publish({
+      type: EventType.AGENT_STARTED,
+      sourceAgent: this.id,
+      payload: {
+        agentId: this.id,
+        role: this.role,
+      },
+    });
+  }
+
+  async stop(): Promise<void> {
+    if (!this.running) {
+      return;
+    }
+
+    // 清理待处理的请求
+    for (const [messageId, { reject }] of this.pendingRequests.entries()) {
+      clearTimeout(reject as unknown as NodeJS.Timeout);
+      reject(new Error('Agent is stopping'));
+      this.pendingRequests.delete(messageId);
+    }
+
+    this.running = false;
+
+    await this.eventBus.publish({
+      type: EventType.AGENT_STOPPED,
+      sourceAgent: this.id,
+      payload: {
+        agentId: this.id,
+        role: this.role,
+      },
+    });
+  }
+
+  async handle(event: Event): Promise<void> {
+    switch (event.type) {
+      case EventType.MESSAGE_PROCESSED:
+        await this.handleMessageProcessed(event);
+        break;
+
+      case EventType.MEMORY_RESULT:
+        await this.handleMemoryResult(event);
+        break;
+
+      case EventType.AGENT_ERROR:
+        await this.handleAgentError(event);
+        break;
+    }
+  }
+
+  /**
+   * 处理用户消息（主入口）
+   */
+  async processMessage(message: Message): Promise<AgentResponse> {
+    if (!this.running) {
+      throw new Error(`Agent ${this.id} is not running`);
+    }
+
+    // 发布消息到 EventBus
+    await this.eventBus.publish({
+      type: EventType.NEW_MESSAGE,
+      sourceAgent: this.id,
+      payload: message,
+      correlationId: message.id,
+    });
+
+    // 注册待处理的请求
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(message.id);
+        reject(new Error(`Request timeout for message ${message.id}`));
+      }, this.requestTimeout);
+
+      this.pendingRequests.set(message.id, {
+        resolve: (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        reject: (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+        timer,
+      });
+    });
+  }
+
+  /**
+   * 请求记忆（向 Memory Agent）
+   */
+  async requestMemory(query: string, options?: {
+    limit?: number;
+    context?: string;
+  }): Promise<unknown> {
+    const requestId = `mem_req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // 发布查询请求
+    await this.eventBus.publish({
+      type: EventType.MEMORY_QUERY,
+      sourceAgent: this.id,
+      payload: {
+        query,
+        requestId,
+        options,
+      },
+    });
+
+    // TODO: 等待 MEMORY_RESULT（在 handleMessageProcessed 中处理）
+
+    // 为了 MVP，先返回空
+    return {};
+  }
+
+  /**
+   * 生成响应（模拟 LLM 调用）
+   * TODO: 集成 OpenClaw 的 Agent Runtime 或 LLM 调用
+   */
+  private async generateResponse(message: Message, memory?: unknown): Promise<string> {
+    // MVP: 简单的响应生成
+    // 后期集成 OpenClaw 的 LLM 调用
+
+    const memoryContext = memory ? '\n[Memory context available]' : '';
+
+    return `[InterfaceAgent ${this.id}]${memoryContext} I received: "${message.content}"`;
+  }
+
+  // Private event handlers
+
+  private async handleMessageProcessed(event: Event): void {
+    const response = event.payload as AgentResponse;
+
+    const pending = this.pendingRequests.get(response.messageId);
+    if (pending) {
+      this.pendingRequests.delete(response.messageId);
+      pending.resolve(response);
+    }
+  }
+
+  private async handleMemoryResult(event: Event): void {
+    const result = event.payload as {
+      requestId: string;
+      data: unknown;
+    };
+
+    // TODO: 根据 requestId 找到对应的请求并处理
+    console.log(`[InterfaceAgent ${this.id}] Memory result received:`, result);
+  }
+
+  private async handleAgentError(event: Event): void {
+    console.error(`[InterfaceAgent ${this.id}] Agent error:`, event.payload);
+
+    // 如果某个 agent 出错，可能需要清理相关的 pending request
+    // TODO: 实现更智能的错误处理
+  }
+}
