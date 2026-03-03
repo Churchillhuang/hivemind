@@ -206,7 +206,8 @@ hivemind test
 |----------|-------------|
 | [README](README.md) | This file |
 | [DEPLOY.md](DEPLOY.md) | Deployment guide |
-| [HIVE_AGENT_DESIGN.md](docs/HIVE_AGENT_DESIGN.md) | Architecture design |
+| [HIVE_AGENT_DESIGN_EN](docs/HIVE_AGENT_DESIGN_EN.md) | Architecture design (English) |
+| [HIVE_AGENT_DESIGN_ZH](docs/HIVE_AGENT_DESIGN.md) | 架构设计 (中文) |
 | [ROADMAP.md](docs/ROADMAP.md) | Implementation roadmap |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 
