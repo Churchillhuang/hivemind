@@ -47,6 +47,7 @@ export interface HiveConfig {
   orchestrator: {
     maxAgents: number;
     idleTimeout: number;
+    negotiationTimeout?: number;  // Task negotiation timeout (ms)
     model?: string;
   };
 
@@ -160,6 +161,7 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
   orchestrator: {
     maxAgents: 10,
     idleTimeout: 30000,
+    negotiationTimeout: 5000,
   },
   stateMachine: {
     persist: true,
