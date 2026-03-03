@@ -91,85 +91,79 @@ These properties can potentially emerge from **global coordination + global memo
 
 ## Architecture Overview
 
-### Current State: Single Agent (OpenClaw)
+### Current State: OpenClaw (Multi-Agent Support, but Lacks Coordination)
 
 ```
-User Message
-    ↓
+OpenClaw Current Architecture:
+├─ Main Session
+├─ Subagents (isolated sessions)
+│  ├─ sessions_spawn (create isolated sessions)
+│  ├─ agents_list (available agents)
+│  └─ subagents (manage sub-agents)
+└─ Single-agent mode per session
+
+Within each session:
 Single Agent
 ├─ Dialogue processing
-├─ Memory management
+├─ Memory management (MEMORY.jsonl format)
 ├─ Task execution
-├─ Social interaction
-└─ Self-reflection
+├─ Tool usage
+└─ Reflection capability (if enabled)
     ↓
 Response
+
+Existing Capabilities:
+- ✅ Can create multiple subagents
+- ✅ Each subagent is an isolated session
+- ✅ Main agent can coordinate subagents
+- ❌ Shared coordination mechanism between subagents
+- ❌ No global state machine
+- ❌ No emergent self-observation
 ```
 
-**Problems:**
-- Too heavy, easily overloaded
-- Single point of failure
-- Restarted on every request (no persistent state)
-- Cannot evolve its own architecture
+**OpenClaw's Multi-Agent Characteristics:**
+- Subagents are isolated sessions
+- Coordinated through main session (not system-level)
+- Each session has its own memory
+- No shared global state
 
----
-
-### Target: Hive Intelligence (Two-Layer Architecture)
+### Target: Hive Intelligence (System-Level Coordination)
 
 ```
 ┌────────────────────────────────────────────────────┐
-│   System Agents (Permanent, Lightweight)          │
+│   System-Level Agent Coordination (not session)     │
+└────────────────────────────────────────────────────┘
+              ↓ System-level, not session-level
+┌────────────────────────────────────────────────────┐
+│   System Agents (Permanent, Shared State)          │
 │   ┌──────────┐  ┌──────────┐  ┌──────────┐      │
 │   │Orchestr. │  │Interface │  │ Memory   │      │
-│   │(Routing) │  │(Dialogue)│  │(Memory)  │      │
-│   │ (Light)  │  │ (Std.)   │  │ (Nano)   │      │
 │   └──────────┘  └──────────┘  └──────────┘      │
-│   ┌──────────┐                                    │
-│   │Reflect   │                                    │
-│   │(Self-Eval)│                                   │
-│   │ (Std.)   │                                    │
-│   └──────────┘                                    │
 └────────────────────────────────────────────────────┘
-              ↓ Coordinate (Event Bus)
+              ↓ Event Bus (system-level communication)
 ┌────────────────────────────────────────────────────┐
-│                  Event Bus                          │
-│   ├─ NEW_MESSAGE  ├─ AGENT_LIFECYCLE             │
-│   ├─ SOCIAL       ├─ ROLE_EVOLUTION              │
-│   ├─ MEMORY       ├─ STATE_TRANSITION            │
-│   └─ REFLECTION   └─ ...                          │
+│                  Shared Infrastructure               │
+│   └─ Global State Machine (system, not session)    │
+│   └─ Shared Memory (global MEMORY.md)              │
+│   └─ Skill Registry (cross-session)                │
 └────────────────────────────────────────────────────┘
-              ↓ Route to
-    ┌──────────┴───────────┐      ┌─────────────────┐
-    │ Functional Agents    │      │Functional Agent │
-    │ (Dynamic, Spawn on   │      │ (Dynamic)       │
-    │  Demand)             │      │                 │
-    │                      │      │ ┌────────────┐   │
-    │  ┌────────────┐     │      │ │FileProc    │   │
-    │  │MoltbookBot │     │      │ │(Short-lived)│  │
-    │  │(Adaptive)  │     │      │ └────────────┘   │
-    │  └────────────┘     │      │                 │
-    │  ┌────────────┐     │      │ ┌────────────┐   │
-    │  │Analyzer    │     │      │ │Reporter    │   │
-    │  │(Adaptive)  │     │      │ │(Dynamic)   │  │
-    │  └────────────┘     │      │ └────────────┘   │
-    └─────────────────────┘      └─────────────────┘
-              ↑ Access
-    └──────────────────────────────────────┐
-    │     Shared Infrastructure            │
-    │  ├─ Shared Memory                    │
-    │  ├─ Global State Machine             │
-    │  ├─ Role Registry                    │
-    │  └─ Skill Registry                   │
-    └──────────────────────────────────────┘
+              ↓
+    ┌─────────────────────────────────────┐
+    │ Functional Agents                    │
+    │ (can be OpenClaw subagents)          │
+    │ (but with system-level coordination) │
+    └─────────────────────────────────────┘
 ```
 
-**Core Principles:**
+**Key Differences:**
 
-1. **Two-Layer Architecture:** System layer (fixed) + Functional layer (dynamic)
-2. **Lightweight Orchestration:** Orchestrator uses light model (≤7B) for routing
-3. **Dynamic Generation:** Functional agents created on-demand, can self-evolve
-4. **Shared Memory:** All agents share the same "self"
-5. **Self-Evolution:** Running agents can adjust roles based on feedback
+| Aspect | OpenClaw Subagents | HiveMind |
+|--------|-------------------|----------|
+| **Coordination level** | Session (main) | System-level (state machine) |
+| **Memory** | Session-scoped | Shared globally |
+| **State** | Per-session independent | Global state machine |
+| **Coordination method** | Main session commands | Event bus |
+| **Emergence observation** | No | Yes (system monitors itself) |
 
 ---
 
