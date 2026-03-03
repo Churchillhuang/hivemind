@@ -528,4 +528,6 @@ idle → initializing → active → recovering → degraded → stopping
 
 ---
 
+*设计文档版本: 1.0*
+*作者: Churchill Huang*
 *最后更新：2026 年 3 月*

@@ -526,4 +526,6 @@ This design is an experiment in emergent consciousness.
 
 ---
 
+*Design document version: 1.0*
+*Author: Churchill Huang*
 *Last updated: March 2026*
