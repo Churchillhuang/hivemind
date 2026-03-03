@@ -79,30 +79,31 @@ The system implements tracking for emergent properties:
 
 **Note:** These are mechanisms. Whether they produce anything resembling "consciousness" is an empirical question - only running the system over time will tell.
 
-### Memory & Model Tiering
+### Memory & Model Configuration
 
-**Memory (5 Tiers):** Optional optimization to reduce token usage by providing different memory levels
+**Memory (default enabled):** All agents except Orchestrator use memory by default
 
 | Tier | Content | Used By | Purpose |
 |------|---------|---------|---------|
-| **L0** | None | Orchestrator | No memory for fast routing decisions |
-| **L1** | Session | Interface | Recent conversation context |
-| **L2** | Task | Functional Agents | Current task context only |
-| **L3** | Knowledge | Memory Agent | Full knowledge base (MEMORY.md) |
+| **L0** | None | Orchestrator | No memory for fast routing |
+| **L1** | Session | Interface | Recent conversation |
+| **L2** | Task | Functional Agents | Current task context |
+| **L3** | Knowledge | Memory Agent | Full knowledge base |
 | **L4** | Sample | Reflection Agent | Memory samples for self-reflection |
 
-**Note:** You can use the same memory level for all agents. Tiering is optional optimization.
+**Model configuration (default uses 3 tiers):** Not all tiers used by default
 
-**Models (4 Tiers):** Optional optimization to use different models for different tasks
+| Tier | Model Size | Used By | Notes |
+|------|-----------|---------|-------|
+| **Nano** | ≤1B | MemoryAgent | Default |
+| **Light** | 3-7B | Orchestrator, Functional | Default |
+| **Standard** | 8-30B | Interface, Reflection | Default |
+| **Heavy** | ≥70B | — | Not used (optional) |
 
-| Tier | Model Size | Use Case | Cost | Latency |
-|------|-----------|----------|------|---------|
-| **Nano** | ≤1B | Simple operations (Memory matching) | Lowest | Fastest |
-| **Light** | 3-7B | Routing, coordination (Orchestrator) | Low | Fast |
-| **Standard** | 8-30B | Dialogue, reflection (Interface, Reflection) | Medium | Medium |
-| **Heavy** | ≥70B | Complex tasks (rarely used) | High | Slow |
-
-**Note:** You can use the same model for all agents. Tiering is optional - single model works fine.
+**Important:** Memory and models are independent configurations:
+- You can use L0 memory with a Standard model
+- You can use L4 memory with a Nano model
+- Configure them separately
 
 ---
 
