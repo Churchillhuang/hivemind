@@ -212,6 +212,7 @@ export class InterfaceAgent extends BaseAgent {
 
   /**
    * 请求记忆（向 Memory Agent）
+   * InterfaceAgent 使用 'session' 记忆层级（L1）
    */
   async requestMemory(query: string, options?: {
     limit?: number;
@@ -219,20 +220,24 @@ export class InterfaceAgent extends BaseAgent {
   }): Promise<unknown> {
     const requestId = `mem_req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // 发布查询请求
+    // 发布查询请求 - 指定记忆层级
     await this.eventBus.publish({
       type: EventType.MEMORY_QUERY,
       sourceAgent: this.id,
       payload: {
         query,
         requestId,
-        options,
+        options: {
+          level: 'session',  // L1: 会话记忆
+          limit: options?.limit || 5,
+          context: options?.context,
+          agentId: this.id,
+        },
       },
     });
 
-    // TODO: 等待 MEMORY_RESULT（在 handleMessageProcessed 中处理）
-
-    // 为了 MVP，先返回空
+    // TODO: 同步等待或异步处理 MEMORY_RESULT
+    // MVP: 返回空，因为 InterfaceAgent 主要用于对话交互
     return {};
   }
 
