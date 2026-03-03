@@ -33,10 +33,21 @@ HiveMind transforms OpenClaw into a multi-agent coordination system with emergen
 - **State Machine** - Global state tracking with checkpoints/rollback
 - **Skill Learning** - Experience captured as reusable skills
 
-### ⚡ Performance
-- **90-99% Token Savings** - Through tiered memory (L0-L4)
-- **75% Cost Reduction** - Through model tiering (Nano to Heavy)
-- **67% Latency Optimization** - Through smart routing
+### ⚡ Architecture Features
+
+**Memory Tiering (L0-L4):**
+- 5-tier memory system for efficient knowledge retrieval
+- Semantic search with 75-77% similarity matching
+- Designed for 90-99% token reduction (needs production validation)
+
+**Model Tiering (Nano to Heavy):**
+- Nano (≤1B) for MemoryAgent, Light (3-7B) for Orchestrator, Standard (8-30B) for Interface/Reflection
+- Designed for 75% cost reduction through smart model selection (needs production validation)
+
+**Smart Routing:**
+- Event-driven coordination, priority queuing
+- 4 load balancing strategies for optimal agent assignment
+- Designed for latency optimization (needs production validation)
 
 ### 🔧 Tools
 - **OpenClaw Integration** - Full Gateway, Channels, Tools support
@@ -248,13 +259,32 @@ Traditional AI mimics the human brain - complex, centralized, monolithic.
 
 ---
 
-## 📈 Performance
+## 📊 Test Results & Performance
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| **Token Usage** | Baseline | 1-10% | 90-99% ↓ |
-| **Cost** | Baseline | 25% | 75% ↓ |
-| **Latency** | Baseline | 33% | 67% ↓ |
+### Phase 5 - Self-Optimization
+| Metric | Actual |
+|--------|--------|
+| **Total Tasks Tracked** | 45 |
+| **Success Rate** | 80.6% |
+| **Anomalies Detected** | 13 |
+| **Optimization Suggestions** | 10 |
+| **Autonomous Tunings Applied** | 7 (0 rollbacks) |
+
+### Phase 6 - Emergence Observation
+| Metric | Actual |
+|--------|--------|
+| **Event Traces Recorded** | 51 |
+| **Active Agents Monitored** | 3 |
+| **Emergence Score** | 46% |
+| **Agency (Top Agent)** | 56% |
+| **Agency (Average)** | 47% |
+
+### Design Goals (Targeted, needs production validation)
+| Metric | Target | Status |
+|--------|--------|--------|
+| **Token Savings** | 90-99% | 🔄 Implemented, needs validation |
+| **Cost Reduction** | 75% | 🔄 Implemented, needs validation |
+| **Latency Optimization** | TBA | 🔄 Designed, needs benchmarking |
 
 ---
 
