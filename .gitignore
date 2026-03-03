@@ -30,9 +30,20 @@ Thumbs.db
 coverage/
 .nyc_output/
 
-# Temporary files
-tmp/
-temp/
+# OpenClaw Workspace Files (Privacy)
+workspace/memory/
+workspace/IDENTITY.md
+workspace/SOUL.md
+workspace/USER.md
+workspace/MEMORY.md
+
+# API Keys and Secrets
+*_key.txt
+*_key.json
+*_secret.txt
+*_secret.json
+credentials.txt
+secrets.txt
 
 # Documentation build
 docs/.next/

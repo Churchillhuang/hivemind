@@ -144,8 +144,8 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
     indexing: {
       enableSemanticSearch: true,
       enableVectorCache: true,
-      workspacePath: '/root/.openclaw/workspace',
-      memoryPath: '/root/.openclaw/workspace/memory',
+      workspacePath: '/path/to/openclaw/workspace',
+      memoryPath: '/path/to/openclaw/workspace/memory',
     },
   },
 };

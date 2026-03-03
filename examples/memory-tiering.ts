@@ -34,8 +34,8 @@ async function main() {
       indexing: {
         enableSemanticSearch: true,
         enableVectorCache: true,
-        workspacePath: '/root/.openclaw/workspace',
-        memoryPath: '/root/.openclaw/workspace/memory',
+        workspacePath: '/path/to/openclaw/workspace',  // 实际使用时替换为真实路径
+        memoryPath: '/path/to/openclaw/workspace/memory',  // 实际使用时替换为真实路径
       },
     },
   };
