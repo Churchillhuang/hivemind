@@ -4,7 +4,7 @@
  * 演示如何使用 HiveGatewayBridge 和 InterfaceAgent
  */
 
-import { HawkGatewayBridge } from '../src/hive/HiveGatewayBridge.js';
+import { HiveGatewayBridge } from '../src/hive/HiveGatewayBridge.js';
 import { InterfaceAgent } from '../src/hive/InterfaceAgent.js';
 import { EventBus, getGlobalEventBus } from '../src/events/EventBus.js';
 import { DEFAULT_HIVE_CONFIG, type HiveConfig, type InboundMessage } from '../src/hive/HiveConfig.js';
@@ -48,6 +48,7 @@ async function main() {
   // 模拟用户消息
   console.log('👤 Simulating user messages...\n');
 
+  // 测试多个消息
   const messages: InboundMessage[] = [
     {
       id: 'msg_001',
@@ -77,10 +78,13 @@ async function main() {
       console.log(`📤 [Bot ${response.agentId}]: ${response.content}\n`);
     } catch (error) {
       console.error(`❌ [Error]: ${error}\n`);
+
+      // 打印 pending requests 和 event history 以便调试
+      console.log('📊 Debug Info:');
+      console.log('   Event History:', bridge.getStatus());
+
     }
 
-    // 延迟以展示事件处理
-    await new Promise(resolve => setTimeout(resolve, 500));
   }
 
   // 显示状态

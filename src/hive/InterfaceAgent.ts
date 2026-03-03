@@ -176,18 +176,12 @@ export class InterfaceAgent extends BaseAgent {
       throw new Error(`Agent ${this.id} is not running`);
     }
 
-    // 发布消息到 EventBus
-    await this.eventBus.publish({
-      type: EventType.NEW_MESSAGE,
-      sourceAgent: this.id,
-      payload: message,
-      correlationId: message.id,
-    });
-
-    // 注册待处理的请求
-    return new Promise((resolve, reject) => {
+    // 先创建 pendingRequest，确保存在
+    const promise = new Promise<AgentResponse>((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.pendingRequests.delete(message.id);
+        if (this.pendingRequests.has(message.id)) {
+          this.pendingRequests.delete(message.id);
+        }
         reject(new Error(`Request timeout for message ${message.id}`));
       }, this.requestTimeout);
 
@@ -203,6 +197,17 @@ export class InterfaceAgent extends BaseAgent {
         timer,
       });
     });
+
+    // 发布消息到 EventBus
+    await this.eventBus.publish({
+      type: EventType.NEW_MESSAGE,
+      sourceAgent: this.id,
+      payload: message,
+      correlationId: message.id,
+    });
+
+    // 返回 Promise
+    return promise;
   }
 
   /**
@@ -249,10 +254,16 @@ export class InterfaceAgent extends BaseAgent {
   private async handleMessageProcessed(event: Event): void {
     const response = event.payload as AgentResponse;
 
+    console.log(`[InterfaceAgent ${this.id}] Handling MESSAGE_PROCESSED for message ${response.messageId}`);
+    console.log(`[InterfaceAgent ${this.id}] Pending requests:`, Array.from(this.pendingRequests.keys()));
+
     const pending = this.pendingRequests.get(response.messageId);
     if (pending) {
+      console.log(`[InterfaceAgent ${this.id}] Found pending request, resolving...`);
       this.pendingRequests.delete(response.messageId);
       pending.resolve(response);
+    } else {
+      console.log(`[InterfaceAgent ${this.id}] No pending request found for message ${response.messageId}`);
     }
   }
 
