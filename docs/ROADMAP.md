@@ -249,7 +249,8 @@
 
 - **v0.1.0** - Phase 0.5 + Phase 1 (Minimal Hive) ✅ Released
 - **v0.2.0** - Phase 2 (OpenClaw Integration) ✅ Released
-- **v0.3.0** - Phase 3 (Enhanced Coordination)
+- **v0.2.5** - Phase 3.1 (Global State Machine) ✅ Released
+- **v0.3.0** - Phase 3 (Enhanced Coordination) 🚧 In Progress
 - **v0.4.0** - Phase 4 (Dynamic Agent Evolution)
 - **v0.5.0** - Phase 5 (Self-Optimization)
 - **v1.0.0** - Phase 6 + Production Readiness
