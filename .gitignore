@@ -37,6 +37,12 @@ workspace/SOUL.md
 workspace/USER.md
 workspace/MEMORY.md
 
+# Android build artifacts
+apps/android/.gradle/
+apps/android/app/build/
+apps/android/.cxx/
+apps/android/.kotlin/
+
 # API Keys and Secrets
 *_key.txt
 *_key.json
