@@ -81,9 +81,12 @@ The system implements tracking for emergent properties:
 
 ### Memory & Model Tiering
 
-**Memory (5 Tiers):** L0 (none) → L1 (session) → L2 (task) → L3 (knowledge) → L4 (sample)
-- Designed to reduce token usage
-- Semantic search implemented
+**Memory (5 Tiers):**
+- L0: None (Orchestrator - no memory for fast routing)
+- L1: Session (Interface - recent conversation)
+- L2: Task (Functional - current task context)
+- L3: Knowledge (Memory - full knowledge base)
+- L4: Sample (Reflection - memory samples for self-reflection)
 
 **Models (4 Tiers):** Nano (≤1B) → Light (3-7B) → Standard (8-30B) → Heavy (≥70B)
 - Right-sized models for different tasks
