@@ -81,16 +81,36 @@ The system implements tracking for emergent properties:
 
 ### Memory & Model Tiering
 
-**Memory (5 Tiers):**
-- L0: None (Orchestrator - no memory for fast routing)
-- L1: Session (Interface - recent conversation)
-- L2: Task (Functional - current task context)
-- L3: Knowledge (Memory - full knowledge base)
-- L4: Sample (Reflection - memory samples for self-reflection)
+**Memory (5 Tiers):** Reduces token usage by providing different memory levels to different agents
 
-**Models (4 Tiers):** Nano (≤1B) → Light (3-7B) → Standard (8-30B) → Heavy (≥70B)
-- Right-sized models for different tasks
-- Light models for Orchestrator, Standard for Interface
+| Tier | Content | Used By | Purpose |
+|------|---------|---------|---------|
+| **L0** | None | Orchestrator | No memory for fast routing decisions |
+| **L1** | Session | Interface | Recent conversation context |
+| **L2** | Task | Functional Agents | Current task context only |
+| **L3** | Knowledge | Memory Agent | Full knowledge base (MEMORY.md) |
+| **L4** | Sample | Reflection Agent | Memory samples for self-reflection |
+
+**Mechanism:**
+- Each agent gets only the memory it needs
+- Orchestrator uses L0 for speed
+- Functional agents use L2 to stay focused
+- Reflection uses L4 samples to avoid loading everything
+
+**Models (4 Tiers):** Right-sized models for different tasks
+
+| Tier | Model Size | Used By | Cost | Latency |
+|------|-----------|---------|------|---------|
+| **Nano** | ≤1B | Memory | Lowest | Fastest |
+| **Light** | 3-7B | Orchestrator, Functional (default) | Low | Fast |
+| **Standard** | 8-30B | Interface, Reflection | Medium | Medium |
+| **Heavy** | ≥70B | Complex tasks (if needed) | High | Slow |
+
+**Mechanism:**
+- Orchestrator uses Light models for routing (high volume, low complexity)
+- Interface uses Standard models for quality interaction
+- Memory uses Nano for simple operations
+- Heavy only used for rare complex tasks (not currently used)
 
 ---
 
