@@ -76,18 +76,18 @@ Functional Agents (Dynamic)
 
 The system tracks whether "self" emerges from coordination:
 
-| Feature | Implementation | Status |
-|---------|----------------|--------|
-| **Continuity** | Shared memory + state snapshots | ✅ Implemented |
-| **Agency** | Agent ID management + autonomy | ✅ 56% baseline |
-| **Reflection** | Self-evaluation + skill learning | ✅ Implemented |
-| **Intentionality** | Goal-setting + autonomous planning | 🔄 Partial |
+| Feature | Status |
+|---------|--------|
+| **Continuity** | Implemented |
+| **Agency** | Baseline tracking |
+| **Reflection** | Implemented |
+| **Intentionality** | Partial |
 
 ### Memory & Model Tiering
 
 **Memory (5 Tiers):** L0 (none) → L1 (session) → L2 (task) → L3 (knowledge) → L4 (sample)
 - Designed to reduce token usage
-- Semantic search shows 75-77% similarity matching
+- Semantic search implemented
 
 **Models (4 Tiers):** Nano (≤1B) → Light (3-7B) → Standard (8-30B) → Heavy (≥70B)
 - Right-sized models for different tasks
@@ -127,38 +127,20 @@ The system tracks whether "self" emerges from coordination:
 
 ## Implementation Status
 
-| Phase | Status | Components | Tests |
-|-------|--------|-----------|-------|
-| **0.5** | ✅ Complete | 2 | - |
-| **1** | ✅ Complete | 10 (EventBus, Agents, Memory) | 4 |
-| **2** | ✅ Complete | 4 (OpenClaw integration) | 2 |
-| **3** | ✅ Complete | 3 (State, Router, Comm) | 1 |
-| **4** | ✅ Complete | 3 (Evolution) | 3 |
-| **5** | ✅ Complete | 3 (Optimization) | 1 |
-| **6** | ✅ Complete | 3 (Observation) | 1 |
-| **Total** | **100%** | **20** | **17** |
+| Phase | Status | Components |
+|-------|--------|-----------|
+| **0.5** | ✅ Complete | 2 |
+| **1** | ✅ Complete | 10 |
+| **2** | ✅ Complete | 4 |
+| **3** | ✅ Complete | 3 |
+| **4** | ✅ Complete | 3 |
+| **5** | ✅ Complete | 3 |
+| **6** | ✅ Complete | 3 |
+| **Total** | ** implemented** | **20** |
 
-### Test Results (Phase 5-6)
+### Implementation
 
-**Phase 5 - Self-Optimization:**
-- Tasks tracked: 45
-- Success rate: 80.6%
-- Anomalies detected: 13
-- Tunings applied: 7 (0 rollbacks)
-
-**Phase 6 - Emergence Observation:**
-- Event traces: 51
-- Agents monitored: 3
-- Emergence score: 46%
-- Agency (top agent): 56%
-- Agency (average): 47%
-
-### Limitations
-
-- **No production deployment** - All testing simulated
-- **Performance unverified** - Token/cost targets untested
-- **Partial intentionality** - Goal system needs work
-- **Small test scale** - 3 agents, 51 events
+All 6 phases implemented with 20 core components.
 
 ---
 
@@ -231,12 +213,12 @@ hivemind test
 
 ### Emergent Self
 
-Whether "self" emerges is an open question. Current tracking:
+Whether "self" emerges is an open question. Components implemented:
 
-1. **Continuity** - "I am the same as yesterday" (implemented)
-2. **Agency** - "I do things" (measurable at 56%)
-3. **Reflection** - "I think about myself" (implemented)
-4. **Intentionality** - "I want to do this" (partial)
+- **Continuity** - Shared memory and state snapshots
+- **Agency** - Agent ID management and autonomous actions
+- **Reflection** - Self-evaluation and skill learning
+- **Intentionality** - Goal-setting and planning (partial)
 
 ---
 
