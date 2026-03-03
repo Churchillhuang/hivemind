@@ -1,161 +1,302 @@
-# Contributing to OpenClaw
+# Contributing to HiveMind 🐝
 
-Welcome to the lobster tank! 🦞
+感谢你有兴趣参与 HiveMind 项目！我们欢迎各种形式的贡献。
 
-## Quick Links
+## 📋 Table of Contents
 
-- **GitHub:** https://github.com/openclaw/openclaw
-- **Vision:** [`VISION.md`](VISION.md)
-- **Discord:** https://discord.gg/qkhbAGHRBT
-- **X/Twitter:** [@steipete](https://x.com/steipete) / [@openclaw](https://x.com/openclaw)
+- [Code of Conduct](#code-of-conduct)
+- [How to Contribute](#how-to-contribute)
+- [Development Setup](#development-setup)
+- [Submitting Changes](#submitting-changes)
+- [Coding Standards](#coding-standards)
+- [Testing](#testing)
+- [Documentation](#documentation)
 
-## Maintainers
+---
 
-- **Peter Steinberger** - Benevolent Dictator
-  - GitHub: [@steipete](https://github.com/steipete) · X: [@steipete](https://x.com/steipete)
+## 🤝 Code of Conduct
 
-- **Shadow** - Discord subsystem, Discord admin, Clawhub, all community moderation
-  - GitHub: [@thewilloftheshadow](https://github.com/thewilloftheshadow) · X: [@4shad0wed](https://x.com/4shad0wed)
+Be respectful, inclusive, and collaborative. We value:
 
-- **Vignesh** - Memory (QMD), formal modeling, TUI, IRC, and Lobster
-  - GitHub: [@vignesh07](https://github.com/vignesh07) · X: [@\_vgnsh](https://x.com/_vgnsh)
+- Constructive feedback
+- Open communication
+- Respect for all contributors
+- Focus on what's best for the project
 
-- **Jos** - Telegram, API, Nix mode
-  - GitHub: [@joshp123](https://github.com/joshp123) · X: [@jjpcodes](https://x.com/jjpcodes)
+---
 
-- **Ayaan Zaidi** - Telegram subsystem, iOS app
-  - GitHub: [@obviyus](https://github.com/obviyus) · X: [@0bviyus](https://x.com/0bviyus)
+## 🚀 How to Contribute
 
-- **Tyler Yust** - Agents/subagents, cron, BlueBubbles, macOS app
-  - GitHub: [@tyler6204](https://github.com/tyler6204) · X: [@tyleryust](https://x.com/tyleryust)
+### Reporting Bugs
 
-- **Mariano Belinky** - iOS app, Security
-  - GitHub: [@mbelinky](https://github.com/mbelinky) · X: [@belimad](https://x.com/belimad)
+Before reporting a bug, please:
 
-- **Nimrod Gutman** - iOS app, macOS app and crustacean features
-  - GitHub: [@ngutman](https://github.com/ngutman) · X: [@theguti](https://x.com/theguti)
+1. Search existing issues to avoid duplicates
+2. Check if the bug is already fixed in the latest version
+3. Gather information:
+   - Steps to reproduce
+   - Expected vs actual behavior
+   - Environment details (Node version, OS, etc.)
+   - Relevant logs or error messages
 
-- **Vincent Koc** - Agents, Telemetry, Hooks, Security
-  - GitHub: [@vincentkoc](https://github.com/vincentkoc) · X: [@vincent_koc](https://x.com/vincent_koc)
+Use the [Bug Report](https://github.com/Churchillhuang/hivemind/issues/new?template=bug_report.md) template.
 
-- **Val Alexander** - UI/UX, Docs, and Agent DevX
-  - GitHub: [@BunsDev](https://github.com/BunsDev) · X: [@BunsDev](https://x.com/BunsDev)
+### Suggesting Features
 
-- **Seb Slight** - Docs, Agent Reliability, Runtime Hardening
-  - GitHub: [@sebslight](https://github.com/sebslight) · X: [@sebslig](https://x.com/sebslig)
+Before submitting a feature request:
 
-- **Christoph Nakazawa** - JS Infra
-  - GitHub: [@cpojer](https://github.com/cpojer) · X: [@cnakazawa](https://x.com/cnakazawa)
+1. Check if the feature already exists or is planned
+2. Consider the scope - is it a new feature or enhancement?
+3. Explain the use case and why it's valuable
 
-- **Gustavo Madeira Santana** - Multi-agents, CLI, web UI
-  - GitHub: [@gumadeiras](https://github.com/gumadeiras) · X: [@gumadeiras](https://x.com/gumadeiras)
+Use the [Feature Request](https://github.com/Churchillhuang/hivemind/issues/new?template=feature_request.md) template.
 
-- **Onur Solmaz** - Agents, dev workflows, ACP integrations, MS Teams
-  - GitHub: [@onutc](https://github.com/onutc), [@osolmaz](https://github.com/osolmaz) · X: [@onusoz](https://x.com/onusoz)
+### Code Contributions
 
-- **Josh Avant** - Core, CLI, Gateway, Security, Agents
-  - GitHub: [@joshavant](https://github.com/joshavant) · X: [@joshavant](https://x.com/joshavant)
+For code changes:
 
-- **Jonathan Taylor** - ACP subsystem, Gateway features/bugs, Gog/Mog/Sog CLI's, SEDMAT
-  - Github [@visionik](https://github.com/visionik) · X: [@visionik](https://x.com/visionik)
-- **Josh Lehman** - Compaction, Tlon/Urbit subsystem
-  - Github [@jalehman](https://github.com/jalehman) · X: [@jlehman\_](https://x.com/jlehman_)
+1. Find an issue to work on or propose one
+2. Comment to claim the issue (avoid duplicate work)
+3. Create your feature branch
+4. Develop and test
+5. Open a Pull Request
 
-## How to Contribute
+---
 
-1. **Bugs & small fixes** → Open a PR!
-2. **New features / architecture** → Start a [GitHub Discussion](https://github.com/openclaw/openclaw/discussions) or ask in Discord first
-3. **Questions** → Discord [#help](https://discord.com/channels/1456350064065904867/1459642797895319552) / [#users-helping-users](https://discord.com/channels/1456350064065904867/1459007081603403828)
+## 🛠️ Development Setup
 
-## Before You PR
+### Prerequisites
 
-- Test locally with your OpenClaw instance
-- Run tests: `pnpm build && pnpm check && pnpm test`
-- Ensure CI checks pass
-- Keep PRs focused (one thing per PR; do not mix unrelated concerns)
-- Describe what & why
+- Node.js 18 or higher
+- npm or yarn
+- Git
+- OpenClaw (for integration testing)
 
-## Control UI Decorators
+### Install Dependencies
 
-The Control UI uses Lit with **legacy** decorators (current Rollup parsing does not support
-`accessor` fields required for standard decorators). When adding reactive fields, keep the
-legacy style:
-
-```ts
-@state() foo = "bar";
-@property({ type: Number }) count = 0;
+```bash
+git clone https://github.com/Churchillhuang/hivemind.git
+cd hivemind
+npm install
 ```
 
-The root `tsconfig.json` is configured for legacy decorators (`experimentalDecorators: true`)
-with `useDefineForClassFields: false`. Avoid flipping these unless you are also updating the UI
-build tooling to support standard decorators.
+### Build Project
 
-## AI/Vibe-Coded PRs Welcome! 🤖
+```bash
+npm run build
+```
 
-Built with Codex, Claude, or other AI tools? **Awesome - just mark it!**
+### Run Tests
 
-Please include in your PR:
+```bash
+# All tests
+npm test
 
-- [ ] Mark as AI-assisted in the PR title or description
-- [ ] Note the degree of testing (untested / lightly tested / fully tested)
-- [ ] Include prompts or session logs if possible (super helpful!)
-- [ ] Confirm you understand what the code does
+# Or use the CLI (after installation)
+hivemind test
+```
 
-AI PRs are first-class citizens here. We just want transparency so reviewers know what to look for.
+### Development Mode
 
-## Current Focus & Roadmap 🗺
+```bash
+npm run dev
+```
 
-We are currently prioritizing:
+---
 
-- **Stability**: Fixing edge cases in channel connections (WhatsApp/Telegram).
-- **UX**: Improving the onboarding wizard and error messages.
-- **Skills**: For skill contributions, head to [ClawHub](https://clawhub.ai/) — the community hub for OpenClaw skills.
-- **Performance**: Optimizing token usage and compaction logic.
+## 📤 Submitting Changes
 
-Check the [GitHub Issues](https://github.com/openclaw/openclaw/issues) for "good first issue" labels!
+### Pull Request Process
 
-## Maintainers
+1. **Create a branch**
 
-We're selectively expanding the maintainer team.
-If you're an experienced contributor who wants to help shape OpenClaw's direction — whether through code, docs, or community — we'd like to hear from you.
+   ```bash
+   git checkout -b feature/amazing-feature
+   # or
+   git checkout -b fix/critical-bug
+   ```
 
-Being a maintainer is a responsibility, not an honorary title. We expect active, consistent involvement — triaging issues, reviewing PRs, and helping move the project forward.
+2. **Make your changes**
 
-Still interested? Email contributing@openclaw.ai with:
+   - Write clean, well-commented code
+   - Follow coding standards (see below)
+   - Update documentation as needed
+   - Add/update tests
 
-- Links to your PRs on OpenClaw (if you don't have any, start there first)
-- Links to open source projects you maintain or actively contribute to
-- Your GitHub, Discord, and X/Twitter handles
-- A brief intro: background, experience, and areas of interest
-- Languages you speak and where you're based
-- How much time you can realistically commit
+3. **Test your changes**
 
-We welcome people across all skill sets — engineering, documentation, community management, and more.
-We review every human-only-written application carefully and add maintainers slowly and deliberately.
-Please allow a few weeks for a response.
+   ```bash
+   npm run build
+   npm test
+   ```
 
-## Report a Vulnerability
+4. **Commit your changes**
 
-We take security reports seriously. Report vulnerabilities directly to the repository where the issue lives:
+   ```bash
+   git add .
+   git commit -m "feat: add amazing feature"
+   # or
+   git commit -m "fix: resolve critical bug"
+   ```
 
-- **Core CLI and gateway** — [openclaw/openclaw](https://github.com/openclaw/openclaw)
-- **macOS desktop app** — [openclaw/openclaw](https://github.com/openclaw/openclaw) (apps/macos)
-- **iOS app** — [openclaw/openclaw](https://github.com/openclaw/openclaw) (apps/ios)
-- **Android app** — [openclaw/openclaw](https://github.com/openclaw/openclaw) (apps/android)
-- **ClawHub** — [openclaw/clawhub](https://github.com/openclaw/clawhub)
-- **Trust and threat model** — [openclaw/trust](https://github.com/openclaw/trust)
+   Use conventional commits:
+   - `feat:` New feature
+   - `fix:` Bug fix
+   - `docs:` Documentation changes
+   - `style:` Code style changes (formatting, etc.)
+   - `refactor:` Code refactoring
+   - `test:` Test changes
+   - `chore:` Maintenance tasks
 
-For issues that don't fit a specific repo, or if you're unsure, email **security@openclaw.ai** and we'll route it.
+5. **Push and create PR**
 
-### Required in Reports
+   ```bash
+   git push origin feature/amazing-feature
+   ```
 
-1. **Title**
-2. **Severity Assessment**
-3. **Impact**
-4. **Affected Component**
-5. **Technical Reproduction**
-6. **Demonstrated Impact**
-7. **Environment**
-8. **Remediation Advice**
+   Then create a Pull Request on GitHub.
 
-Reports without reproduction steps, demonstrated impact, and remediation advice will be deprioritized. Given the volume of AI-generated scanner findings, we must ensure we're receiving vetted reports from researchers who understand the issues.
+### Pull Request Checklist
+
+Before submitting, ensure:
+
+- [ ] Code follows style guidelines
+- [ ] Tests pass locally
+- [ ] Documentation is updated
+- [ ] Commit messages are clear
+- [ ] PR description explains what and why
+- [ ] No unrelated changes
+
+---
+
+## 📐 Coding Standards
+
+### TypeScript Guidelines
+
+- Use TypeScript strict mode
+- Prefer `const` over `let`
+- Use meaningful variable/function names
+- Add JSDoc comments for public APIs
+- Keep functions focused and small
+
+### Code Style
+
+```typescript
+// ✅ Good - clear and self-documenting
+const calculateSuccessRate = (tasks: Task[]): number => {
+  const succeeded = tasks.filter(t => t.success).length;
+  return succeeded / tasks.length;
+};
+
+// ❌ Bad - vague and unclear
+const calc = (t) => {
+  const x = t.filter(y => y.z).length;
+  return x / t.length;
+};
+```
+
+### File Organization
+
+- One class/component per file
+- Logical folder structure
+- Separate concerns (core, hive, events, examples)
+- Export only what's necessary
+
+---
+
+## 🧪 Testing
+
+### Test Structure
+
+```
+examples/
+├── integration-test-complete.ts    # Full integration test
+├── emergence-observation-test.ts   # Emergence features
+└── self-optimization-test.ts       # Optimization features
+```
+
+### Writing Tests
+
+```typescript
+// Write clear test descriptions
+test("should calculate success rate correctly", () => {
+  const tasks = [
+    { success: true },
+    { success: false },
+    { success: true }
+  ];
+
+  const rate = calculateSuccessRate(tasks);
+
+  expect(rate).toBe(0.67);
+});
+```
+
+### Test Coverage
+
+- Aim for high coverage on core components
+- Test both happy path and edge cases
+- Include integration tests for workflows
+
+---
+
+## 📚 Documentation
+
+### Code Comments
+
+- Comment on *why*, not *what*
+- Keep comments up to date
+- Avoid obvious comments
+
+### API Documentation
+
+- Document public APIs with JSDoc
+- Include examples for complex usage
+- Document parameters and return types
+
+### README Updates
+
+- Add new features to README
+- Update usage examples
+- Keep performance stats current
+
+---
+
+## 🎯 Focus Areas
+
+We're currently interested in:
+
+1. **Emergence Enhancement** - Improve self-awareness and intentionality
+2. **Performance** - Further optimize token usage and cost
+3. **Tooling** - Better debugging and monitoring tools
+4. **Documentation** - Complete API reference and guides
+5. **Testing** - Expand test coverage
+
+---
+
+## 🤖 AI-Assisted Contributions
+
+We welcome contributions made with AI tools! Just be transparent:
+
+- Mark AI-assisted in PR description
+- Note testing level (untested / lightly / fully tested)
+- Understand what the code does
+- Include prompts/session logs if helpful
+
+---
+
+## 📞 Getting Help
+
+- **GitHub Issues:** For bugs and feature requests
+- **Discussions:** For questions and ideas
+- **Discord:** (if available) Real-time help
+
+---
+
+## 🙏 Thank You
+
+Every contribution helps make HiveMind better. Thank you for your time and effort!
+
+---
+
+**Built with 🧵 and 🦞**
