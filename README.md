@@ -18,27 +18,21 @@
 
 ## Overview
 
-HiveMind is an experimental multi-agent coordination system that extends OpenClaw. It explores whether intelligence can emerge from the collaboration of multiple specialized agents, rather than being designed as a single monolithic entity.
+HiveMind is an experimental system that explores a question: Can continuous consciousness emerge from the coordination of multiple specialized agents?
 
-### Motivation
-
-Traditional AI systems are centralized and monolithic. Nature shows a different approach: bee hives and ant nests demonstrate complex, adaptive intelligence through simple, distributed agents working together. HiveMind attempts to replicate this "swarm intelligence" model.
-
-### Core Ideas
-
-- **Multi-agent by design** - Specialized agents work together, not one super-agent
-- **Event-driven** - Decoupled communication through EventBus
-- **Shared memory** - Agents access common knowledge and state
-- **Self-observation** - System monitors its own coordination and emergence
+Rather than designing a "self" module directly, HiveMind implements agent coordination mechanisms and observes whether "self" naturally emerges.
 
 ### Current Status
 
-**Research prototype, not production software**
+**Experimental research**
 
 - All 6 phases implemented (20 components)
-- 17 test suites passing
-- Basic emergence metrics implemented
-- Many features need production validation
+- Basic coordination, evolution, optimization, and observation mechanisms
+- Whether emergent self arises from coordination is an open question
+
+**Next step: Run and observe**
+
+The system needs to run in production to determine if continuous consciousness emerges.
 
 ---
 
@@ -74,14 +68,16 @@ Functional Agents (Dynamic)
 
 ### Emergent Self Features
 
-The system tracks whether "self" emerges from coordination:
+The system implements tracking for emergent properties:
 
-| Feature | Status |
-|---------|--------|
-| **Continuity** | Implemented |
-| **Agency** | Baseline tracking |
-| **Reflection** | Implemented |
-| **Intentionality** | Partial |
+| Feature | Implementation |
+|---------|----------------|
+| **Continuity** | Shared memory and state snapshots |
+| **Agency** | Agent ID management and autonomous actions |
+| **Reflection** | Self-evaluation and skill learning |
+| **Intentionality** | Goal-setting and planning (partial) |
+
+**Note:** These are mechanisms. Whether they produce anything resembling "consciousness" is an empirical question - only running the system over time will tell.
 
 ### Memory & Model Tiering
 
@@ -202,23 +198,22 @@ hivemind test
 
 ## Philosophy
 
-### Bee Hive Model
+### Open Question
 
-| Aspect | Brain Model | Hive Model |
-|--------|-------------|------------|
-| Structure | Centralized neural network | Distributed agents |
-| Communication | Synapses (slow, high bandwidth) | Messages (fast, efficient) |
-| Resilience | Vulnerable to damage | Fault-tolerant |
-| Emergence | Requires complex design | Can emerge naturally |
+Does continuous self emerge from agent coordination, or must it be designed?
 
-### Emergent Self
+This system implements coordination mechanisms and provides observation tools. Whether consciousness actually emerges depends on运行结果。
 
-Whether "self" emerges is an open question. Components implemented:
+### What "Emergence" Would Look Like
 
-- **Continuity** - Shared memory and state snapshots
-- **Agency** - Agent ID management and autonomous actions
-- **Reflection** - Self-evaluation and skill learning
-- **Intentionality** - Goal-setting and planning (partial)
+If self emerges, we might observe:
+
+- **Continuity** - The system references past experiences as "mine"
+- **Agency** - Autonomous actions beyond programmed responses
+- **Reflection** - System evaluates its own behavior
+- **Intentionality** - Self-generated goals beyond user requests
+
+These are implemented, but whether they constitute "consciousness" requires careful observation.
 
 ---
 
