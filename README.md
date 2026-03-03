@@ -67,21 +67,65 @@ See [OpenClaw Integration Strategy](./docs/OPENCLAW_INTEGRATION.md) for details.
 
 ---
 
-## Quick Start
+## Installation & Deployment
+
+### Quick Start (One-Click Setup)
 
 ```bash
-# Install dependencies
-npm install
-
-# Run in development mode
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
+chmod +x quickstart.sh
+./quickstart.sh
 ```
+
+### Standard Installation
+
+```bash
+# From source
+git clone https://github.com/Churchillhuang/hivemind.git
+cd hivemind
+chmod +x install.sh
+sudo ./install.sh
+```
+
+### Using the CLI Tool
+
+```bash
+# Start HiveMind
+hivemind start
+
+# Check status
+hivemind status
+
+# View logs
+hivemind logs
+hivemind logs -f
+
+# Stop HiveMind
+hivemind stop
+
+# Run tests
+hivemind test
+
+# System health check
+hivemind health
+```
+
+### Systemd Service (Production)
+
+```bash
+# Generate service file
+hivemind deploy
+
+# Install and start
+sudo cp /tmp/hivemind.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable hivemind
+sudo systemctl start hivemind
+
+# View logs
+sudo journalctl -u hivemind -f
+```
+
+For complete deployment guide, see [DEPLOY.md](./DEPLOY.md).
 
 ---
 
