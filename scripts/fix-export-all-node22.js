@@ -68,8 +68,10 @@ var __exportAll = (all) => { let target = {}; for (var name in all) { __defProp(
         content = content.replace(importMatch[0], exportAllInline);
         modified = true;
         
-        // Update all __exportAll calls to remove no_symbols parameter
-        content = content.replace(/__exportAll\(([^,]+),\s*[^)]+\)/g, '__exportAll($1)');
+        // Remove the second parameter (no_symbols) from ALL __exportAll calls
+        // Pattern: __exportAll({...}, false) -> __exportAll({...})
+        // Pattern: __exportAll({...}, true) -> __exportAll({...})
+        content = content.replace(/,\s*(?:true|false)\s*(?=\)\s*[;,])/g, '');
         
         if (modified) {
             await fs.writeFile(filePath, content, 'utf8');
