@@ -7,6 +7,8 @@
 import { promises as fs } from "fs";
 import { randomUUID } from "node:crypto";
 import path from "path";
+import type { Event } from "../events/Event.js";
+import type { EventBus } from "../events/EventBus.js";
 import type { HiveConfig } from "./HiveConfig.js";
 
 /**
@@ -101,8 +103,10 @@ export class GlobalStateMachine {
   private checkpoints: Map<string, Checkpoint> = new Map();
   private checkpointTimer?: NodeJS.Timeout;
   private hiveConfig: HiveConfig;
+  private eventBus?: EventBus;
+  private unsubscribeFromEvents?: () => void;
 
-  constructor(config: StateMachineConfig, hiveConfig: HiveConfig) {
+  constructor(config: StateMachineConfig, hiveConfig: HiveConfig, eventBus?: EventBus) {
     this.config = {
       enablePersistence: true,
       checkpointPath: "/root/.openclaw/.hivemind/state",
@@ -114,6 +118,7 @@ export class GlobalStateMachine {
     };
 
     this.hiveConfig = hiveConfig;
+    this.eventBus = eventBus;
     this.state = this.initializeState();
   }
 
@@ -153,6 +158,7 @@ export class GlobalStateMachine {
 
     // 启动检查点定时器
     this.startCheckpointSchedule();
+    this.subscribeToRuntimeEvents();
 
     console.log(
       `[GSM] Started (state: ${this.state.currentState}, generation: ${this.state.generation})`,
@@ -167,6 +173,10 @@ export class GlobalStateMachine {
     if (this.checkpointTimer) {
       clearInterval(this.checkpointTimer);
       this.checkpointTimer = undefined;
+    }
+    if (this.unsubscribeFromEvents) {
+      this.unsubscribeFromEvents();
+      this.unsubscribeFromEvents = undefined;
     }
 
     // 保存最终状态
@@ -256,6 +266,7 @@ export class GlobalStateMachine {
    */
   async createCheckpoint(_reason?: string): Promise<Checkpoint> {
     const checkpointId = `ckpt_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`;
+    const recentEvents = this.eventBus?.getHistory(undefined, 100) ?? [];
 
     // 生成快照
     const stateString = JSON.stringify(this.state);
@@ -271,7 +282,7 @@ export class GlobalStateMachine {
         activeAgents: [...this.state.metadata.activeAgents],
         pendingTasks: this.state.metadata.pendingTasks,
         completedTasks: this.state.metadata.completedTasks,
-        eventHistorySize: 0, // TODO: 从 EventBus 获取
+        eventHistorySize: recentEvents.length,
         generation: this.state.generation,
       },
       snapshots: {
@@ -281,7 +292,15 @@ export class GlobalStateMachine {
           completed: this.state.metadata.completedTasks,
           failed: this.state.metadata.failedTasks,
         }),
-        events: "", // TODO: 从 EventBus 获取
+        events: JSON.stringify(
+          recentEvents.map((event) => ({
+            id: event.id,
+            type: event.type,
+            sourceAgent: event.sourceAgent,
+            timestamp: event.timestamp,
+            correlationId: event.correlationId,
+          })),
+        ),
       },
     };
 
@@ -406,6 +425,80 @@ export class GlobalStateMachine {
     }, interval);
 
     console.log(`[GSM] Checkpoint schedule started (interval: ${interval}ms)`);
+  }
+
+  /**
+   * 订阅 EventBus 以自动维护状态元数据
+   */
+  private subscribeToRuntimeEvents(): void {
+    if (!this.eventBus || this.unsubscribeFromEvents) {
+      return;
+    }
+
+    this.unsubscribeFromEvents = this.eventBus.subscribe("*", async (event) => {
+      this.handleRuntimeEvent(event);
+    });
+  }
+
+  /**
+   * 根据运行时事件更新统计数据
+   */
+  private handleRuntimeEvent(event: Event): void {
+    if (typeof event.type !== "string") {
+      return;
+    }
+
+    switch (event.type) {
+      case "AGENT_STARTED":
+        this.mergeActiveAgent(event, true);
+        break;
+      case "AGENT_STOPPED":
+        this.mergeActiveAgent(event, false);
+        break;
+      case "TASK_CREATED":
+      case "TASK_REQUESTED":
+        this.updateMetadata({
+          pendingTasks: this.state.metadata.pendingTasks + 1,
+        });
+        break;
+      case "TASK_COMPLETED":
+        this.updateMetadata({
+          pendingTasks: Math.max(0, this.state.metadata.pendingTasks - 1),
+          completedTasks: this.state.metadata.completedTasks + 1,
+        });
+        break;
+      case "TASK_FAILED":
+        this.updateMetadata({
+          pendingTasks: Math.max(0, this.state.metadata.pendingTasks - 1),
+          failedTasks: this.state.metadata.failedTasks + 1,
+        });
+        break;
+      default:
+        break;
+    }
+  }
+
+  private mergeActiveAgent(event: Event, started: boolean): void {
+    const payload = (event.payload ?? {}) as { agentId?: unknown };
+    const agentId =
+      typeof payload.agentId === "string" && payload.agentId.trim() !== ""
+        ? payload.agentId
+        : event.sourceAgent;
+
+    if (!agentId || agentId === "EventBus") {
+      return;
+    }
+
+    const active = new Set(this.state.metadata.activeAgents);
+    if (started) {
+      active.add(agentId);
+    } else {
+      active.delete(agentId);
+    }
+
+    this.updateMetadata({
+      activeAgents: Array.from(active),
+    });
   }
 
   /**

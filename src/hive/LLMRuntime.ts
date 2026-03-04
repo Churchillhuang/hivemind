@@ -4,21 +4,14 @@
  * 支持 OpenClaw 的 ModelProvider，提供统一的 LLM 调用能力
  */
 
-import type { HiveConfig } from './HiveConfig.js';
-import { randomUUID } from 'node:crypto';
-import type {
-  ModelUsage,
-} from '../utils/ModelConfig.js';
+import { randomUUID } from "node:crypto";
+import type { ModelUsage } from "../utils/ModelConfig.js";
+import type { HiveConfig } from "./HiveConfig.js";
 
 /**
  * LLM 提供者类型
  */
-export type LLMProvider =
-  | 'anthropic'
-  | 'openai'
-  | 'openrouter'
-  | 'custom'
-  | 'unknown';
+export type LLMProvider = "anthropic" | "openai" | "openrouter" | "custom" | "unknown";
 
 /**
  * LLM 请求参数
@@ -37,12 +30,14 @@ export interface LLMRequestParams {
  * LLM 消息
  */
 export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | Array<{
-    type: 'text' | 'image_url';
-    text?: string;
-    image_url?: { url: string };
-  }>;
+  role: "system" | "user" | "assistant" | "tool";
+  content:
+    | string
+    | Array<{
+        type: "text" | "image_url";
+        text?: string;
+        image_url?: { url: string };
+      }>;
   toolCallId?: string;
   toolCalls?: LLMToolCall[];
 }
@@ -54,7 +49,7 @@ export interface LLMToolDefinition {
   name: string;
   description: string;
   parameters: {
-    type: 'object';
+    type: "object";
     properties: Record<string, unknown>;
     required?: string[];
   };
@@ -65,7 +60,7 @@ export interface LLMToolDefinition {
  */
 export interface LLMToolCall {
   id: string;
-  type: 'function';
+  type: "function";
   function: {
     name: string;
     arguments: string;
@@ -79,7 +74,7 @@ export interface LLMResponse {
   id: string;
   model: string;
   content: string;
-  finishReason: 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'unknown';
+  finishReason: "stop" | "length" | "tool_calls" | "content_filter" | "unknown";
   usage: {
     promptTokens: number;
     completionTokens: number;
@@ -96,9 +91,9 @@ export interface LLMResponse {
 export interface LLMOpts {
   agentId: string;
   modelUsage?: ModelUsage;
-  timeout?: number;  // 毫秒
+  timeout?: number; // 毫秒
   retryAttempts?: number;
-  retryDelay?: number;  // 毫秒
+  retryDelay?: number; // 毫秒
   enableCostTracking?: boolean;
   enableTokenCounting?: boolean;
 }
@@ -111,6 +106,7 @@ export class LLMRuntime {
   private callsCount = 0;
   private totalTokens = 0;
   private totalCost = 0;
+  private totalLatency = 0;
 
   constructor(hiveConfig: HiveConfig) {
     this.hiveConfig = hiveConfig;
@@ -124,8 +120,8 @@ export class LLMRuntime {
 
     // 设置默认值
     const modelUsage = opts.modelUsage || {
-      tier: 'standard',
-      modelName: 'llama-13b',
+      tier: "standard",
+      modelName: "llama-13b",
       temperature: 0.7,
       maxTokens: 2000,
       timeout: 60,
@@ -159,9 +155,12 @@ export class LLMRuntime {
     // 更新统计
     this.callsCount++;
     this.totalTokens += response.usage.totalTokens;
+    this.totalLatency += latency;
 
     console.log(`[LLMRuntime] Response received:`);
-    console.log(`  Tokens: ${response.usage.totalTokens} (${response.usage.promptTokens} + ${response.usage.completionTokens})`);
+    console.log(
+      `  Tokens: ${response.usage.totalTokens} (${response.usage.promptTokens} + ${response.usage.completionTokens})`,
+    );
     console.log(`  Cost: $${(response.cost || 0).toFixed(6)}`);
     console.log(`  Latency: ${latency}ms`);
 
@@ -194,7 +193,7 @@ export class LLMRuntime {
         content: message.content,
       })),
       tools: params.tools?.map((tool) => ({
-        type: 'function',
+        type: "function",
         function: {
           name: tool.name,
           description: tool.description,
@@ -209,9 +208,9 @@ export class LLMRuntime {
     let response: Response;
     try {
       response = await fetch(endpoint, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'content-type': 'application/json',
+          "content-type": "application/json",
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(body),
@@ -223,12 +222,10 @@ export class LLMRuntime {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(
-        `Gateway LLM request failed (${response.status}): ${text.slice(0, 300)}`,
-      );
+      throw new Error(`Gateway LLM request failed (${response.status}): ${text.slice(0, 300)}`);
     }
 
-    const payload = await response.json() as {
+    const payload = (await response.json()) as {
       id?: string;
       model?: string;
       choices?: Array<{
@@ -250,23 +247,22 @@ export class LLMRuntime {
     };
 
     const choice = payload.choices?.[0];
-    const content = choice?.message?.content ?? '';
+    const content = choice?.message?.content ?? "";
     const promptTokens = payload.usage?.prompt_tokens ?? this.estimateTokens(params.messages);
     const completionTokens = payload.usage?.completion_tokens ?? this.estimateTokens(content);
-    const totalTokens =
-      payload.usage?.total_tokens ?? promptTokens + completionTokens;
+    const totalTokens = payload.usage?.total_tokens ?? promptTokens + completionTokens;
 
     const toolCalls: LLMToolCall[] | undefined = choice?.message?.tool_calls?.map((entry) => ({
-      id: entry.id || `tool_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
-      type: 'function',
+      id: entry.id || `tool_${randomUUID().replaceAll("-", "").slice(0, 9)}`,
+      type: "function",
       function: {
-        name: entry.function?.name || 'unknown',
-        arguments: entry.function?.arguments || '{}',
+        name: entry.function?.name || "unknown",
+        arguments: entry.function?.arguments || "{}",
       },
     }));
 
     return {
-      id: payload.id || `llm_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
+      id: payload.id || `llm_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`,
       model: payload.model || model,
       content,
       finishReason: this.normalizeFinishReason(choice?.finish_reason),
@@ -284,34 +280,34 @@ export class LLMRuntime {
       process.env.OPENCLAW_GATEWAY_HTTP_URL ||
       process.env.OPENCLAW_GATEWAY_URL ||
       process.env.CLAWDBOT_GATEWAY_URL ||
-      'http://127.0.0.1:18789';
+      "http://127.0.0.1:18789";
 
-    if (raw.startsWith('ws://')) {
-      return raw.replace(/^ws:\/\//, 'http://');
+    if (raw.startsWith("ws://")) {
+      return raw.replace(/^ws:\/\//, "http://");
     }
-    if (raw.startsWith('wss://')) {
-      return raw.replace(/^wss:\/\//, 'https://');
+    if (raw.startsWith("wss://")) {
+      return raw.replace(/^wss:\/\//, "https://");
     }
     return raw;
   }
 
   private estimateTokens(input: unknown): number {
-    if (typeof input === 'string') {
+    if (typeof input === "string") {
       return Math.ceil(input.length / 4);
     }
     return Math.ceil(JSON.stringify(input).length / 4);
   }
 
-  private normalizeFinishReason(reason: string | undefined): LLMResponse['finishReason'] {
+  private normalizeFinishReason(reason: string | undefined): LLMResponse["finishReason"] {
     if (
-      reason === 'stop' ||
-      reason === 'length' ||
-      reason === 'tool_calls' ||
-      reason === 'content_filter'
+      reason === "stop" ||
+      reason === "length" ||
+      reason === "tool_calls" ||
+      reason === "content_filter"
     ) {
       return reason;
     }
-    return 'unknown';
+    return "unknown";
   }
 
   /**
@@ -321,7 +317,7 @@ export class LLMRuntime {
     usage: { promptTokens: number; completionTokens: number },
     modelUsage: ModelUsage,
   ): number {
-    const inputCostPer1K = modelUsage.estimatedCostPer1K * 0.5;  // 输入成本通常是 50%
+    const inputCostPer1K = modelUsage.estimatedCostPer1K * 0.5; // 输入成本通常是 50%
     const outputCostPer1K = modelUsage.estimatedCostPer1K;
 
     const inputCost = (usage.promptTokens / 1000) * inputCostPer1K;
@@ -341,13 +337,14 @@ export class LLMRuntime {
     avgLatency: number;
   } {
     const avgTokensPerCall = this.callsCount > 0 ? this.totalTokens / this.callsCount : 0;
+    const avgLatency = this.callsCount > 0 ? this.totalLatency / this.callsCount : 0;
 
     return {
       callsCount: this.callsCount,
       totalTokens: this.totalTokens,
       totalCost: this.totalCost,
       avgTokensPerCall,
-      avgLatency: 0,  // TODO: 跟踪
+      avgLatency,
     };
   }
 
@@ -358,5 +355,6 @@ export class LLMRuntime {
     this.callsCount = 0;
     this.totalTokens = 0;
     this.totalCost = 0;
+    this.totalLatency = 0;
   }
 }

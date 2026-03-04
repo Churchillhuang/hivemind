@@ -1,10 +1,17 @@
-import path from 'node:path';
+import path from "node:path";
 
 /**
  * Hive Modes - 支持传统单 Agent 模式和 HiveMind 多 Agent 模式
  */
 
-export type HiveMode = 'single' | 'multi';
+export type HiveMode = "single" | "multi";
+
+/**
+ * Orchestrator 模式
+ * - simple: 简化模式，只有直路由和协商路由
+ * - full: 完整模式，包含任务队列、状态管理等
+ */
+export type OrchestratorMode = "simple" | "full";
 
 /**
  * 记忆层级
@@ -14,7 +21,7 @@ export type HiveMode = 'single' | 'multi';
  * - knowledge: MEMORY.md + 全量记忆检索（MemoryAgent）
  * - sample: 抽样记忆 1-2 周（ReflectionAgent）
  */
-export type MemoryLevel = 'none' | 'session' | 'task' | 'knowledge' | 'sample';
+export type MemoryLevel = "none" | "session" | "task" | "knowledge" | "sample";
 
 /**
  * 模型大小分类
@@ -23,17 +30,17 @@ export type MemoryLevel = 'none' | 'session' | 'task' | 'knowledge' | 'sample';
  * - standard: 8-30B（标准，如 Llama-13B/30B, Qwen-14B）
  * - heavy: ≥70B（重，如 Llama-70B, Qwen-72B）
  */
-export type ModelTier = 'nano' | 'light' | 'standard' | 'heavy';
+export type ModelTier = "nano" | "light" | "standard" | "heavy";
 
 /**
  * Agent 模型配置
  */
 export interface AgentModelConfig {
-  tier: ModelTier;           // 模型分层
-  model?: string;            // 具体模型名称（可选，覆盖默认）
-  temperature?: number;      // 温度参数
-  maxTokens?: number;        // 最大输出 tokens
-  timeout?: number;          // 超时时间（秒）
+  tier: ModelTier; // 模型分层
+  model?: string; // 具体模型名称（可选，覆盖默认）
+  temperature?: number; // 温度参数
+  maxTokens?: number; // 最大输出 tokens
+  timeout?: number; // 超时时间（秒）
 }
 
 export interface HiveConfig {
@@ -47,9 +54,10 @@ export interface HiveConfig {
 
   // Orchestrator 配置
   orchestrator: {
+    mode: OrchestratorMode; // 'simple' | 'full'
     maxAgents: number;
     idleTimeout: number;
-    negotiationTimeout?: number;  // Task negotiation timeout (ms)
+    negotiationTimeout?: number; // Task negotiation timeout (ms)
     model?: string;
   };
 
@@ -58,6 +66,48 @@ export interface HiveConfig {
     persist: boolean;
     checkpointInterval: number;
     checkpointPath: string;
+  };
+
+  // Gateway 集成配置
+  gateway: {
+    enabled: boolean; // 是否启用 Gateway 集成
+    url: string; // Gateway WebSocket URL (ws://127.0.0.1:18789)
+    token?: string; // Gateway 认证 token（可选）
+    autoConnect: boolean; // 是否自动连接
+    reconnectInterval: number; // 重连间隔（毫秒）
+    connectionTimeout: number; // 连接超时（毫秒）
+  };
+
+  // 观测体系配置
+  observation: {
+    enabled: boolean; // 总开关
+    components: {
+      emergenceMonitor: {
+        enabled: boolean;
+        samplingInterval: number; // 采样间隔（毫秒）
+      };
+      collaborationAnalyzer: {
+        enabled: boolean;
+      };
+      continuityAnalyzer: {
+        enabled: boolean;
+      };
+      analysisEngine: {
+        enabled: boolean;
+        analysisInterval: number; // 分析间隔（毫秒）
+      };
+      autonomousTuner: {
+        enabled: boolean;
+        tuningInterval: number; // 调优间隔（毫秒）
+      };
+      metricsTracker: {
+        enabled: boolean;
+        retentionDays: number; // 数据保留天数
+      };
+      memoryEnhancement: {
+        enabled: boolean;
+      };
+    };
   };
 
   // Agents 配置
@@ -72,7 +122,7 @@ export interface HiveConfig {
     functional: {
       enabled: boolean;
       maxConcurrent: number;
-      lifespan: 'task' | 'session' | 'persistent';
+      lifespan: "task" | "session" | "persistent";
     };
   };
 
@@ -90,30 +140,30 @@ export interface HiveConfig {
      * 不同 Agent 使用的记忆层级
      */
     layers: {
-      orchestrator: MemoryLevel;   // L0: 零记忆
-      interface: MemoryLevel;      // L1: 会话记忆
-      functional: MemoryLevel;     // L2: 任务记忆
-      memory: MemoryLevel;         // L3: 知识记忆
-      reflection: MemoryLevel;     // L4: 样本记忆
+      orchestrator: MemoryLevel; // L0: 零记忆
+      interface: MemoryLevel; // L1: 会话记忆
+      functional: MemoryLevel; // L2: 任务记忆
+      memory: MemoryLevel; // L3: 知识记忆
+      reflection: MemoryLevel; // L4: 样本记忆
     };
 
     /**
      * 记忆保留策略
      */
     retention: {
-      sessionDays: number;         // InterfaceAgent 保留天数
-      sampleDays: number;          // ReflectionAgent 抽样天数
-      taskMaxFiles: number;        // Functional Agents 任务最大文件数
+      sessionDays: number; // InterfaceAgent 保留天数
+      sampleDays: number; // ReflectionAgent 抽样天数
+      taskMaxFiles: number; // Functional Agents 任务最大文件数
     };
 
     /**
      * 记忆索引配置
      */
     indexing: {
-      enableSemanticSearch: boolean;   // 启用语义搜索
-      enableVectorCache: boolean;      // 启用向量缓存
-      workspacePath: string;           // OpenClaw workspace 路径
-      memoryPath: string;              // 记忆文件路径
+      enableSemanticSearch: boolean; // 启用语义搜索
+      enableVectorCache: boolean; // 启用向量缓存
+      workspacePath: string; // OpenClaw workspace 路径
+      memoryPath: string; // 记忆文件路径
     };
   };
 
@@ -126,29 +176,29 @@ export interface HiveConfig {
      * 模型分层到实际模型的映射
      */
     tierMapping: {
-      nano?: string;       // 如: "distilbert-base"
-      light?: string;      // 如: "llama-7b", "qwen-7b"
-      standard?: string;   // 如: "llama-13b", "qwen-14b"
-      heavy?: string;      // 如: "llama-70b", "qwen-72b"
+      nano?: string; // 如: "distilbert-base"
+      light?: string; // 如: "llama-7b", "qwen-7b"
+      standard?: string; // 如: "llama-13b", "qwen-14b"
+      heavy?: string; // 如: "llama-70b", "qwen-72b"
     };
 
     /**
      * System Agents 模型配置
      */
     system: {
-      orchestrator: AgentModelConfig;      // L0 - 路由决策（nano/light）
-      interface: AgentModelConfig;         // L1 - 对话交互（standard）
-      memory: AgentModelConfig;            // L3 - 记忆检索（light，主要是关键词匹配）
-      reflection: AgentModelConfig;        // L4 - 自我反思（standard）
+      orchestrator: AgentModelConfig; // L0 - 路由决策（nano/light）
+      interface: AgentModelConfig; // L1 - 对话交互（standard）
+      memory: AgentModelConfig; // L3 - 记忆检索（light，主要是关键词匹配）
+      reflection: AgentModelConfig; // L4 - 自我反思（standard）
     };
 
     /**
      * Functional Agents 默认模型配置
      */
     functional: {
-      default: AgentModelConfig;           // 默认配置（light/standard）
+      default: AgentModelConfig; // 默认配置（light/standard）
       overrides: {
-        [key: string]: AgentModelConfig;   // 特定 task 的覆盖配置
+        [key: string]: AgentModelConfig; // 特定 task 的覆盖配置
       };
     };
   };
@@ -156,11 +206,12 @@ export interface HiveConfig {
 
 export const DEFAULT_HIVE_CONFIG: HiveConfig = {
   enabled: false,
-  mode: 'single',
+  mode: "single",
   eventBus: {
     maxHistorySize: 1000,
   },
   orchestrator: {
+    mode: "full", // 默认使用完整模式
     maxAgents: 10,
     idleTimeout: 30000,
     negotiationTimeout: 5000,
@@ -169,6 +220,50 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
     persist: true,
     checkpointInterval: 10000,
     checkpointPath: path.join(process.cwd(), ".hivemind", "state.json"),
+  },
+  gateway: {
+    enabled: true, // 默认启用 Gateway 集成
+    url:
+      process.env.OPENCLAW_GATEWAY_URL ||
+      process.env.CLAWDBOT_GATEWAY_URL ||
+      "ws://127.0.0.1:18789",
+    autoConnect: true, // 默认自动连接
+    reconnectInterval: 5000, // 5秒重连间隔
+    connectionTimeout: 10000, // 10秒连接超时
+  },
+  observation: {
+    enabled: true, // 默认启用观测体系
+    components: {
+      // 核心组件：默认启用
+      emergenceMonitor: {
+        enabled: true,
+        samplingInterval: 1000, // 1秒采样间隔
+      },
+      metricsTracker: {
+        enabled: true,
+        retentionDays: 7, // 保留7天数据
+      },
+      // 分析组件：默认启用
+      collaborationAnalyzer: {
+        enabled: true,
+      },
+      continuityAnalyzer: {
+        enabled: true,
+      },
+      analysisEngine: {
+        enabled: true,
+        analysisInterval: 60000, // 1分钟分析间隔
+      },
+      // 调优组件：默认启用但间隔较长
+      autonomousTuner: {
+        enabled: true,
+        tuningInterval: 300000, // 5分钟调优间隔
+      },
+      // 记忆增强：默认启用
+      memoryEnhancement: {
+        enabled: true,
+      },
+    },
   },
   agents: {
     system: {
@@ -181,22 +276,22 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
     functional: {
       enabled: true,
       maxConcurrent: 5,
-      lifespan: 'task',
+      lifespan: "task",
     },
   },
   skillLearning: {
     enabled: true,
-    sharedSkillsPath: 'shared_skills/',
-    agentSkillsPath: 'agent_skills/',
+    sharedSkillsPath: "shared_skills/",
+    agentSkillsPath: "agent_skills/",
     minSuccessThreshold: 0.8,
   },
   memory: {
     layers: {
-      orchestrator: 'none',       // L0
-      interface: 'session',       // L1
-      functional: 'task',         // L2
-      memory: 'knowledge',        // L3
-      reflection: 'sample',       // L4
+      orchestrator: "none", // L0
+      interface: "session", // L1
+      functional: "task", // L2
+      memory: "knowledge", // L3
+      reflection: "sample", // L4
     },
     retention: {
       sessionDays: 2,
@@ -218,40 +313,40 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
   agentModels: {
     // 模型映射（实际使用的模型名称）
     tierMapping: {
-      nano: 'distilbert-base',
-      light: 'llama-7b',
-      standard: 'llama-13b',
-      heavy: 'llama-70b',
+      nano: "distilbert-base",
+      light: "llama-7b",
+      standard: "llama-13b",
+      heavy: "llama-70b",
     },
 
     // System Agents 配置
     system: {
       orchestrator: {
-        tier: 'light',           // ≤7B - 路由决策，不需要理解复杂语义
-        model: undefined,         // 使用 tierMapping.light
-        temperature: 0.1,         // 低温度，路由决策应该确定性高
-        maxTokens: 500,           // 少输出，只返回决策
+        tier: "light", // ≤7B - 路由决策，不需要理解复杂语义
+        model: undefined, // 使用 tierMapping.light
+        temperature: 0.1, // 低温度，路由决策应该确定性高
+        maxTokens: 500, // 少输出，只返回决策
         timeout: 30,
       },
       interface: {
-        tier: 'standard',         // 8-30B - 对话交互需要理解复杂语义
-        model: undefined,         // 使用 tierMapping.standard
-        temperature: 0.7,         // 中等温度，有创造力但不太随机
-        maxTokens: 2000,          // 需要生成完整回复
+        tier: "standard", // 8-30B - 对话交互需要理解复杂语义
+        model: undefined, // 使用 tierMapping.standard
+        temperature: 0.7, // 中等温度，有创造力但不太随机
+        maxTokens: 2000, // 需要生成完整回复
         timeout: 60,
       },
       memory: {
-        tier: 'nano',             // ≤1B - 关键词匹配，几乎不需要 LLM
-        model: undefined,         // 使用 tierMapping.nano
-        temperature: 0.0,         // 零温度，精确匹配
+        tier: "nano", // ≤1B - 关键词匹配，几乎不需要 LLM
+        model: undefined, // 使用 tierMapping.nano
+        temperature: 0.0, // 零温度，精确匹配
         maxTokens: 100,
         timeout: 10,
       },
       reflection: {
-        tier: 'standard',         // 8-30B - 模式分析需要理解
-        model: undefined,         // 使用 tierMapping.standard
-        temperature: 0.3,         // 低温度，分析需要确定性
-        maxTokens: 1500,          // 分析报告
+        tier: "standard", // 8-30B - 模式分析需要理解
+        model: undefined, // 使用 tierMapping.standard
+        temperature: 0.3, // 低温度，分析需要确定性
+        maxTokens: 1500, // 分析报告
         timeout: 60,
       },
     },
@@ -259,23 +354,23 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
     // Functional Agents 配置
     functional: {
       default: {
-        tier: 'light',            // 3-7B - 功能任务大多数简单
-        model: undefined,         // 使用 tierMapping.light
-        temperature: 0.5,         // 中低温度
+        tier: "light", // 3-7B - 功能任务大多数简单
+        model: undefined, // 使用 tierMapping.light
+        temperature: 0.5, // 中低温度
         maxTokens: 1000,
         timeout: 30,
       },
       overrides: {
         // 特别任务使用更大模型
-        'philosophy_generation': {
-          tier: 'standard',       // 哲学文本生成需要理解
+        philosophy_generation: {
+          tier: "standard", // 哲学文本生成需要理解
           model: undefined,
           temperature: 0.8,
           maxTokens: 2000,
           timeout: 60,
         },
-        'complex_analysis': {
-          tier: 'standard',
+        complex_analysis: {
+          tier: "standard",
           model: undefined,
           temperature: 0.4,
           maxTokens: 1500,

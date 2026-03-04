@@ -9,6 +9,7 @@ import { BaseAgent } from "../core/Agent.js";
 import { Event, EventType } from "../events/Event.js";
 import { EventBus } from "../events/EventBus.js";
 import type { HiveConfig } from "../hive/HiveConfig.js";
+import { SkillPersistence } from "./SkillPersistence.js";
 
 /**
  * AgentTemplate - Agent 模板
@@ -64,6 +65,7 @@ export class AgentFactory extends BaseAgent {
       reject: (err: Error) => void;
     }
   > = new Map();
+  private skillPersistence: SkillPersistence;
 
   constructor(
     config: { id: string; role: string; description?: string },
@@ -81,6 +83,7 @@ export class AgentFactory extends BaseAgent {
     );
 
     this.hiveConfig = hiveConfig;
+    this.skillPersistence = new SkillPersistence(hiveConfig);
     this.initializeTemplates();
   }
 
@@ -93,6 +96,8 @@ export class AgentFactory extends BaseAgent {
 
     // 订阅事件
     this.subscribeTo(EventType.AGENT_CREATE_REQUEST);
+    this.subscribeTo(EventType.TASK_COMPLETED);
+    this.subscribeTo(EventType.TASK_FAILED);
 
     await this.eventBus?.publish({
       type: EventType.AGENT_STARTED,
@@ -132,8 +137,16 @@ export class AgentFactory extends BaseAgent {
   }
 
   async handle(event: Event): Promise<void> {
-    if (event.type === "AGENT_CREATE_REQUEST") {
-      await this.handleCreateRequest(event);
+    switch (event.type) {
+      case "AGENT_CREATE_REQUEST":
+        await this.handleCreateRequest(event);
+        break;
+      case "TASK_COMPLETED":
+      case "TASK_FAILED":
+        await this.handleTaskLifecycleEvent(event);
+        break;
+      default:
+        break;
     }
   }
 
@@ -218,6 +231,8 @@ export class AgentFactory extends BaseAgent {
         payload: {
           templateId: payload.templateId || "unknown",
           instanceId: instance.instanceId,
+          taskId: instance.currentTaskId,
+          role: instance.role,
         },
       });
 
@@ -254,6 +269,18 @@ export class AgentFactory extends BaseAgent {
       throw new Error(`Template not found: ${templateId}`);
     }
 
+    if (template.type === "functional") {
+      const maxConcurrent = Math.max(1, this.hiveConfig.agents.functional.maxConcurrent);
+      const activeFunctionalInstances = this.getInstances({ type: "functional" }).filter(
+        (instance) => instance.status !== "destroying",
+      ).length;
+      if (activeFunctionalInstances >= maxConcurrent) {
+        throw new Error(
+          `Functional agent limit reached: ${activeFunctionalInstances}/${maxConcurrent}`,
+        );
+      }
+    }
+
     // 生成实例 ID
     const instanceId =
       request.agentId ||
@@ -262,6 +289,10 @@ export class AgentFactory extends BaseAgent {
     // 创建实例
     const instance: AgentInstance = {
       ...template,
+      lifespan:
+        template.type === "functional"
+          ? this.hiveConfig.agents.functional.lifespan
+          : template.lifespan,
       instanceId,
       createdAt: Date.now(),
       status: "creating",
@@ -275,6 +306,25 @@ export class AgentFactory extends BaseAgent {
 
     // 注册实例
     this.instances.set(instanceId, instance);
+
+    // 加载技能（如果启用）
+    if (this.hiveConfig.skillLearning.enabled) {
+      try {
+        const { agentSkills, sharedSkills } =
+          await this.skillPersistence.listAvailableSkills(instanceId);
+
+        if (agentSkills.length > 0 || sharedSkills.length > 0) {
+          console.log(
+            `[AgentFactory ${this.id}] Loaded ${agentSkills.length} agent skills and ${sharedSkills.length} shared skills for ${instanceId}`,
+          );
+          // 技能已加载，可以附加到实例元数据中
+          // 注意：AgentInstance 接口可能需要扩展以包含技能信息
+        }
+      } catch (error) {
+        console.warn(`[AgentFactory ${this.id}] Failed to load skills for ${instanceId}:`, error);
+        // 技能加载失败不阻塞 agent 创建
+      }
+    }
 
     // 模拟创建延迟（实际应该是实例化真正的 Agent 类）
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -295,6 +345,24 @@ export class AgentFactory extends BaseAgent {
     console.log(`[AgentFactory ${this.id}] Instance created: ${instanceId} (${template.name})`);
 
     return instance;
+  }
+
+  private async handleTaskLifecycleEvent(event: Event): Promise<void> {
+    const payload = (event.payload ?? {}) as { taskId?: unknown };
+    if (typeof payload.taskId !== "string" || payload.taskId.trim() === "") {
+      return;
+    }
+
+    const instancesToDestroy: string[] = [];
+    for (const instance of this.instances.values()) {
+      if (instance.lifespan === "task" && instance.currentTaskId === payload.taskId) {
+        instancesToDestroy.push(instance.instanceId);
+      }
+    }
+
+    for (const instanceId of instancesToDestroy) {
+      await this.destroyInstance(instanceId);
+    }
   }
 
   /**

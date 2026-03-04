@@ -5,11 +5,12 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { EventType } from "../events/Event.js";
+import { EventBus } from "../events/EventBus.js";
 import { GatewayClient, type GatewayClientOptions } from "../gateway/client.js";
+import type { EventFrame } from "../gateway/protocol/index.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
 import { VERSION } from "../version.js";
-import { EventBus } from "../events/EventBus.js";
-import type { EventFrame } from "../gateway/protocol/index.js";
 import type { HiveConfig } from "./HiveConfig.js";
 import { HiveGatewayBridge } from "./HiveGatewayBridge.js";
 import type { HiveManager } from "./HiveManager.js";
@@ -189,12 +190,53 @@ export class GatewayIntegrator {
     }
   }
 
-  private async handleChatEvent(_event: EventFrame): Promise<void> {
-    // TODO: 按需桥接更多事件
+  private async handleChatEvent(event: EventFrame): Promise<void> {
+    await this.config.eventBus.publish({
+      type: EventType.NEW_MESSAGE,
+      sourceAgent: "GatewayIntegrator",
+      payload: event.payload,
+    });
   }
 
-  private async handleAgentEvent(_event: EventFrame): Promise<void> {
-    // TODO: 按需桥接更多事件
+  private async handleAgentEvent(event: EventFrame): Promise<void> {
+    const payload = (event.payload ?? {}) as {
+      status?: string;
+      agentId?: string;
+      error?: string;
+    };
+
+    if (payload.status === "started" || payload.status === "online") {
+      await this.config.eventBus.publish({
+        type: EventType.AGENT_STARTED,
+        sourceAgent: "GatewayIntegrator",
+        payload: event.payload,
+      });
+      return;
+    }
+
+    if (payload.status === "stopped" || payload.status === "offline") {
+      await this.config.eventBus.publish({
+        type: EventType.AGENT_STOPPED,
+        sourceAgent: "GatewayIntegrator",
+        payload: event.payload,
+      });
+      return;
+    }
+
+    if (payload.status === "error" || Boolean(payload.error)) {
+      await this.config.eventBus.publish({
+        type: EventType.AGENT_ERROR,
+        sourceAgent: "GatewayIntegrator",
+        payload: event.payload,
+      });
+      return;
+    }
+
+    await this.config.eventBus.publish({
+      type: "GATEWAY_AGENT_EVENT",
+      sourceAgent: "GatewayIntegrator",
+      payload: event.payload,
+    });
   }
 
   private async onConnected(): Promise<void> {

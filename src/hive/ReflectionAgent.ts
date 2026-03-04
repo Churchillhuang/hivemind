@@ -9,6 +9,7 @@ import { Event, EventType } from "../events/Event.js";
 import { EventBus } from "../events/EventBus.js";
 import type { HiveConfig } from "../hive/HiveConfig.js";
 import type { AgentInfo } from "./Orchestrator.js";
+import { SkillPersistence, type SkillRecord } from "./SkillPersistence.js";
 
 /**
  * Reflection - 反思记录
@@ -60,6 +61,7 @@ export class ReflectionAgent extends BaseAgent {
   private skillStore: Map<string, SkillState> = new Map();
   private reflectionInterval: NodeJS.Timeout | null = null;
   private agentStats: Map<string, AgentInfo> = new Map();
+  private skillPersistence: SkillPersistence;
 
   constructor(
     config: { id: string; role: string; description?: string },
@@ -77,6 +79,7 @@ export class ReflectionAgent extends BaseAgent {
     );
 
     this.hiveConfig = hiveConfig;
+    this.skillPersistence = new SkillPersistence(hiveConfig);
   }
 
   async start(): Promise<void> {
@@ -435,6 +438,10 @@ export class ReflectionAgent extends BaseAgent {
     const payload = event.payload as {
       skillName: string;
       successRate: number;
+      agentId?: string;
+      taskId?: string;
+      tags?: string[];
+      description?: string;
     };
 
     const skill: SkillState = {
@@ -447,6 +454,33 @@ export class ReflectionAgent extends BaseAgent {
 
     this.skillStore.set(payload.skillName, skill);
     console.log(`[ReflectionAgent ${this.id}] Skill learned: ${payload.skillName}`);
+
+    // 持久化技能
+    if (this.hiveConfig.skillLearning.enabled) {
+      const agentId = payload.agentId || "system";
+      const skillRecord: SkillRecord = {
+        name: payload.skillName,
+        learned: true,
+        successRate: payload.successRate,
+        lastUsed: Date.now(),
+        usageCount: 0,
+        extractedFrom: payload.taskId,
+        extractedAt: Date.now(),
+        tags: payload.tags,
+        description: payload.description,
+      };
+
+      try {
+        await this.skillPersistence.saveSkill(skillRecord, agentId);
+
+        // 如果技能成功率高，也保存到共享技能库
+        if (payload.successRate >= this.hiveConfig.skillLearning.minSuccessThreshold) {
+          await this.skillPersistence.saveSharedSkill(skillRecord, agentId);
+        }
+      } catch (error) {
+        console.error(`[ReflectionAgent ${this.id}] Failed to persist skill:`, error);
+      }
+    }
   }
 
   /**

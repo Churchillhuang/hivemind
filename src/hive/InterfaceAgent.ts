@@ -4,11 +4,13 @@
  * 负责处理用户消息，与 Gateway 交互，通过 EventBus 协调其他 Agents
  */
 
-import { BaseAgent } from '../core/Agent.js';
-import { randomUUID } from 'node:crypto';
-import { Event, EventType } from '../events/Event.js';
-import { EventBus, getGlobalEventBus } from '../events/EventBus.js';
-import type { HiveConfig } from '../hive/HiveConfig.js';
+import { randomUUID } from "node:crypto";
+import { BaseAgent } from "../core/Agent.js";
+import { Event, EventType } from "../events/Event.js";
+import { EventBus, getGlobalEventBus } from "../events/EventBus.js";
+import type { HiveConfig, MemoryLevel } from "../hive/HiveConfig.js";
+import { getAgentModelConfig } from "../utils/ModelConfig.js";
+import { LLMRuntime } from "./LLMRuntime.js";
 
 export interface Message {
   id: string;
@@ -28,25 +30,44 @@ export interface AgentResponse {
 }
 
 export class InterfaceAgent extends BaseAgent {
-  private pendingRequests: Map<string, {
-    resolve: (value: AgentResponse) => void;
-    reject: (err: Error) => void;
-    timer: NodeJS.Timeout;
-  }> = new Map();
+  private hiveConfig: HiveConfig;
+  private llmRuntime: LLMRuntime;
+  private pendingRequests: Map<
+    string,
+    {
+      resolve: (value: AgentResponse) => void;
+      reject: (err: Error) => void;
+      timer: NodeJS.Timeout;
+    }
+  > = new Map();
+  private pendingMemoryRequests: Map<
+    string,
+    {
+      resolve: (value: unknown) => void;
+      reject: (err: Error) => void;
+      timer: NodeJS.Timeout;
+    }
+  > = new Map();
   private readonly requestTimeout = 30000; // 30 秒超时
+  private readonly memoryRequestTimeout = 500; // 记忆是增强项，不应阻塞主回复
 
   constructor(
     config: { id: string; role: string; description?: string },
-    _hiveConfig: HiveConfig,
+    hiveConfig: HiveConfig,
     eventBus?: EventBus,
   ) {
-    super({
-      id: config.id,
-      role: config.role,
-      type: 'system',
-      description: config.description,
-    }, eventBus);
+    super(
+      {
+        id: config.id,
+        role: config.role,
+        type: "system",
+        description: config.description,
+      },
+      eventBus,
+    );
 
+    this.hiveConfig = hiveConfig;
+    this.llmRuntime = new LLMRuntime(hiveConfig);
     this.eventBus = eventBus || getGlobalEventBus();
 
     // 订阅事件
@@ -81,8 +102,13 @@ export class InterfaceAgent extends BaseAgent {
     // 清理待处理的请求
     for (const [messageId, pending] of this.pendingRequests.entries()) {
       clearTimeout(pending.timer);
-      pending.reject(new Error('Agent is stopping'));
+      pending.reject(new Error("Agent is stopping"));
       this.pendingRequests.delete(messageId);
+    }
+    for (const [requestId, pending] of this.pendingMemoryRequests.entries()) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error("Agent is stopping"));
+      this.pendingMemoryRequests.delete(requestId);
     }
 
     this.running = false;
@@ -99,19 +125,19 @@ export class InterfaceAgent extends BaseAgent {
 
   async handle(event: Event): Promise<void> {
     switch (event.type) {
-      case 'TASK_ASSIGNED':
+      case "TASK_ASSIGNED":
         await this.handleTaskAssigned(event);
         break;
 
-      case 'MESSAGE_PROCESSED':
+      case "MESSAGE_PROCESSED":
         await this.handleMessageProcessed(event);
         break;
 
-      case 'MEMORY_RESULT':
+      case "MEMORY_RESULT":
         await this.handleMemoryResult(event);
         break;
 
-      case 'AGENT_ERROR':
+      case "AGENT_ERROR":
         await this.handleAgentError(event);
         break;
     }
@@ -130,7 +156,7 @@ export class InterfaceAgent extends BaseAgent {
     }
 
     const taskData = assignment.taskData;
-    if (typeof taskData !== 'object' || taskData === null) {
+    if (typeof taskData !== "object" || taskData === null) {
       return;
     }
 
@@ -142,22 +168,21 @@ export class InterfaceAgent extends BaseAgent {
   private coerceMessage(record: Record<string, unknown>, fallbackId?: string): Message {
     return {
       id:
-        typeof record.id === 'string'
+        typeof record.id === "string"
           ? record.id
-          : fallbackId || `msg_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
-      content: typeof record.content === 'string' ? record.content : JSON.stringify(record),
-      userId: typeof record.userId === 'string' ? record.userId : undefined,
-      channelId: typeof record.channelId === 'string' ? record.channelId : undefined,
-      timestamp: typeof record.timestamp === 'number' ? record.timestamp : Date.now(),
+          : fallbackId || `msg_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`,
+      content: typeof record.content === "string" ? record.content : JSON.stringify(record),
+      userId: typeof record.userId === "string" ? record.userId : undefined,
+      channelId: typeof record.channelId === "string" ? record.channelId : undefined,
+      timestamp: typeof record.timestamp === "number" ? record.timestamp : Date.now(),
       metadata:
-        typeof record.metadata === 'object' && record.metadata !== null
+        typeof record.metadata === "object" && record.metadata !== null
           ? (record.metadata as Record<string, unknown>)
           : undefined,
     };
   }
 
   private async handleNewMessage(message: Message, correlationId?: string): Promise<void> {
-
     console.log(`[InterfaceAgent ${this.id}] Processing message:`, message);
 
     try {
@@ -194,7 +219,7 @@ export class InterfaceAgent extends BaseAgent {
         type: EventType.AGENT_ERROR,
         sourceAgent: this.id,
         payload: {
-          message: 'Failed to process message',
+          message: "Failed to process message",
           error: error instanceof Error ? error.message : String(error),
         },
       });
@@ -247,13 +272,28 @@ export class InterfaceAgent extends BaseAgent {
    * 请求记忆（向 Memory Agent）
    * InterfaceAgent 使用 'session' 记忆层级（L1）
    */
-  async requestMemory(query: string, options?: {
-    limit?: number;
-    context?: string;
-  }): Promise<unknown> {
-    const requestId = `mem_req_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`;
+  async requestMemory(
+    query: string,
+    options?: {
+      limit?: number;
+      context?: string;
+    },
+  ): Promise<unknown> {
+    const requestId = `mem_req_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`;
+    const memoryLevel: MemoryLevel = this.hiveConfig.memory?.layers.interface || "session";
 
-    // 发布查询请求 - 指定记忆层级
+    const resultPromise = new Promise<unknown>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (this.pendingMemoryRequests.has(requestId)) {
+          this.pendingMemoryRequests.delete(requestId);
+        }
+        // 记忆不可用时降级为空上下文，避免阻塞主流程
+        resolve({});
+      }, this.memoryRequestTimeout);
+      this.pendingMemoryRequests.set(requestId, { resolve, reject, timer });
+    });
+
+    // 发布查询请求 - 使用配置驱动的记忆层级
     await this.eventBus.publish({
       type: EventType.MEMORY_QUERY,
       sourceAgent: this.id,
@@ -261,7 +301,7 @@ export class InterfaceAgent extends BaseAgent {
         query,
         requestId,
         options: {
-          level: 'session',  // L1: 会话记忆
+          level: memoryLevel,
           limit: options?.limit || 5,
           context: options?.context,
           agentId: this.id,
@@ -269,22 +309,54 @@ export class InterfaceAgent extends BaseAgent {
       },
     });
 
-    // TODO: 同步等待或异步处理 MEMORY_RESULT
-    // MVP: 返回空，因为 InterfaceAgent 主要用于对话交互
-    return {};
+    return resultPromise;
   }
 
-  /**
-   * 生成响应（模拟 LLM 调用）
-   * TODO: 集成 OpenClaw 的 Agent Runtime 或 LLM 调用
-   */
   private async generateResponse(message: Message, memory?: unknown): Promise<string> {
-    // MVP: 简单的响应生成
-    // 后期集成 OpenClaw 的 LLM 调用
+    const hasGatewayConfig = Boolean(
+      process.env.OPENCLAW_GATEWAY_HTTP_URL ||
+      process.env.OPENCLAW_GATEWAY_URL ||
+      process.env.CLAWDBOT_GATEWAY_URL,
+    );
 
-    const memoryContext = memory ? '\n[Memory context available]' : '';
+    const memoryContext = memory ? "\n[Memory context available]" : "";
+    if (!hasGatewayConfig) {
+      return `[InterfaceAgent ${this.id}]${memoryContext} I received: "${message.content}"`;
+    }
 
-    return `[InterfaceAgent ${this.id}]${memoryContext} I received: "${message.content}"`;
+    try {
+      const modelUsage = getAgentModelConfig("interface", undefined, this.hiveConfig);
+      const response = await this.llmRuntime.call(
+        {
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are the HiveMind Interface Agent. Respond helpfully and concisely to the user.",
+            },
+            {
+              role: "user",
+              content: memory
+                ? `${message.content}\n\nMemory context:\n${JSON.stringify(memory)}`
+                : message.content,
+            },
+          ],
+        },
+        {
+          agentId: this.id,
+          modelUsage,
+          timeout: Math.min(modelUsage.timeout * 1000, 15000),
+        },
+      );
+
+      return (
+        response.content ||
+        `[InterfaceAgent ${this.id}]${memoryContext} I received: "${message.content}"`
+      );
+    } catch (error) {
+      console.warn(`[InterfaceAgent ${this.id}] LLM call failed, using fallback response`, error);
+      return `[InterfaceAgent ${this.id}]${memoryContext} I received: "${message.content}"`;
+    }
   }
 
   // Private event handlers
@@ -292,8 +364,13 @@ export class InterfaceAgent extends BaseAgent {
   private async handleMessageProcessed(event: Event): Promise<void> {
     const response = event.payload as AgentResponse;
 
-    console.log(`[InterfaceAgent ${this.id}] Handling MESSAGE_PROCESSED for message ${response.messageId}`);
-    console.log(`[InterfaceAgent ${this.id}] Pending requests:`, Array.from(this.pendingRequests.keys()));
+    console.log(
+      `[InterfaceAgent ${this.id}] Handling MESSAGE_PROCESSED for message ${response.messageId}`,
+    );
+    console.log(
+      `[InterfaceAgent ${this.id}] Pending requests:`,
+      Array.from(this.pendingRequests.keys()),
+    );
 
     const pending = this.pendingRequests.get(response.messageId);
     if (pending) {
@@ -301,7 +378,9 @@ export class InterfaceAgent extends BaseAgent {
       this.pendingRequests.delete(response.messageId);
       pending.resolve(response);
     } else {
-      console.log(`[InterfaceAgent ${this.id}] No pending request found for message ${response.messageId}`);
+      console.log(
+        `[InterfaceAgent ${this.id}] No pending request found for message ${response.messageId}`,
+      );
     }
   }
 
@@ -311,8 +390,14 @@ export class InterfaceAgent extends BaseAgent {
       data: unknown;
     };
 
-    // TODO: 根据 requestId 找到对应的请求并处理
-    console.log(`[InterfaceAgent ${this.id}] Memory result received:`, result);
+    const pending = this.pendingMemoryRequests.get(result.requestId);
+    if (!pending) {
+      return;
+    }
+
+    this.pendingMemoryRequests.delete(result.requestId);
+    clearTimeout(pending.timer);
+    pending.resolve(result.data);
   }
 
   private async handleAgentError(event: Event): Promise<void> {

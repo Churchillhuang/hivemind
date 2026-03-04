@@ -12,12 +12,13 @@
  *    - 示例：file_analysis → 投标选择最优
  */
 
-import { BaseAgent } from "../core/Agent.js";
 import { randomUUID } from "node:crypto";
+import { BaseAgent } from "../core/Agent.js";
 import { Event, EventType } from "../events/Event.js";
 import { EventBus } from "../events/EventBus.js";
 import type { HiveConfig } from "./HiveConfig.js";
 import { NegotiationRouter } from "./NegotiationRouter.js";
+import { SkillBasedNegotiationRouter } from "./SkillBasedNegotiationRouter.js";
 
 /**
  * Task - 待处理任务
@@ -154,13 +155,21 @@ export class Orchestrator extends BaseAgent {
    */
   private ensureNegotiationRouter(): void {
     if (!this.negotiationRouter) {
-      this.negotiationRouter = new NegotiationRouter(this.hiveConfig, this.eventBus);
+      this.negotiationRouter = this.hiveConfig.skillLearning.enabled
+        ? new SkillBasedNegotiationRouter(this.hiveConfig, this.eventBus)
+        : new NegotiationRouter(this.hiveConfig, this.eventBus);
       this.negotiationRouter.start();
       // NegotiationRouter can be lazily initialized during routing, so ensure the
       // orchestrator listens for negotiation outcomes even after start().
       this.subscribeTo("TASK_ASSIGNED");
       this.subscribeTo("TASK_NEGOTIATION_FAILED");
-      console.log(`[Orchestrator ${this.id}] NegotiationRouter initialized`);
+      console.log(
+        `[Orchestrator ${this.id}] ${
+          this.hiveConfig.skillLearning.enabled
+            ? "SkillBasedNegotiationRouter"
+            : "NegotiationRouter"
+        } initialized`,
+      );
     }
   }
 
@@ -363,6 +372,61 @@ export class Orchestrator extends BaseAgent {
         error: `Negotiation failed: ${payload.reason}`,
       });
     }
+
+    if (!this.hiveConfig.agents.functional.enabled) {
+      return;
+    }
+
+    const announcement = (payload.announcement ?? {}) as {
+      taskType?: unknown;
+      description?: unknown;
+    };
+    const taskType =
+      typeof announcement.taskType === "string" && announcement.taskType.trim() !== ""
+        ? announcement.taskType
+        : "general_task";
+
+    try {
+      const fallbackAgentId = await this.createAgent({
+        type: "functional",
+        role: `${taskType}_fallback_agent`,
+        description:
+          typeof announcement.description === "string" && announcement.description.trim() !== ""
+            ? announcement.description
+            : `Fallback agent for ${taskType}`,
+        templateId: this.resolveTemplateForTask(taskType),
+        taskId: payload.taskId,
+        taskType,
+      });
+
+      const fallbackTask = this.taskQueue.get(payload.taskId);
+      if (!fallbackTask) {
+        return;
+      }
+
+      fallbackTask.assignedAgent = fallbackAgentId;
+      fallbackTask.status = "Processing";
+      fallbackTask.error = undefined;
+      this.routingRules.set(taskType, [fallbackAgentId]);
+
+      await this.eventBus?.publish({
+        type: EventType.TASK_ASSIGNED,
+        sourceAgent: this.id,
+        routingMode: "direct",
+        payload: {
+          taskId: fallbackTask.id,
+          assignedTo: fallbackAgentId,
+          taskData: fallbackTask.payload,
+          reason: "negotiation_fallback",
+        },
+      });
+
+      console.log(
+        `[Orchestrator ${this.id}] Negotiation fallback assigned: ${fallbackTask.id} → ${fallbackAgentId}`,
+      );
+    } catch (error) {
+      console.error(`[Orchestrator ${this.id}] Fallback agent creation failed:`, error);
+    }
   }
 
   /**
@@ -370,7 +434,7 @@ export class Orchestrator extends BaseAgent {
    */
   async handleNewMessage(event: Event): Promise<void> {
     const task: Task = {
-      id: `task_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
+      id: `task_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`,
       type: "message",
       priority: "medium",
       sourceAgent: event.sourceAgent,
@@ -391,7 +455,7 @@ export class Orchestrator extends BaseAgent {
    */
   async handleTaskRequest(event: Event): Promise<void> {
     const task: Task = {
-      id: `task_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
+      id: `task_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`,
       type: "action",
       priority: "medium",
       sourceAgent: event.sourceAgent,
@@ -529,17 +593,20 @@ export class Orchestrator extends BaseAgent {
     type: "system" | "functional";
     role: string;
     description: string;
-  }): Promise<void> {
+    templateId?: string;
+    taskId?: string;
+    taskType?: string;
+  }): Promise<string> {
     console.log(`[Orchestrator ${this.id}] Creating agent: ${config.role}`);
 
-    const agentId = `${config.type}_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`;
+    const agentId = `${config.type}_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`;
 
     // 注册 Agent（实际创建由 AgentFactory 负责，这里先注册）
     this.registerAgent({
       id: agentId,
       type: config.type,
       role: config.role,
-      capabilities: [], // TODO: 根据 role 推断
+      capabilities: config.taskType ? [config.taskType] : [],
       isRunning: false,
       currentTasks: [],
       stats: {
@@ -555,9 +622,13 @@ export class Orchestrator extends BaseAgent {
       sourceAgent: this.id,
       payload: {
         agentId,
+        templateId: config.templateId,
+        taskId: config.taskId,
         ...config,
       },
     });
+
+    return agentId;
   }
 
   /**
@@ -569,10 +640,39 @@ export class Orchestrator extends BaseAgent {
       role?: string;
     };
 
-    const agent = this.agents.get(payload.agentId);
-    if (agent) {
-      agent.isRunning = true;
-      console.log(`[Orchestrator ${this.id}] Agent started: ${payload.agentId}`);
+    let agent = this.agents.get(payload.agentId);
+    if (!agent) {
+      // Dynamic agents may come from external creators; register a minimal runtime view.
+      agent = {
+        id: payload.agentId,
+        type: payload.agentId.startsWith("system_") ? "system" : "functional",
+        role: payload.role || payload.agentId,
+        capabilities: [],
+        isRunning: false,
+        currentTasks: [],
+        stats: {
+          tasksCompleted: 0,
+          tasksFailed: 0,
+          avgProcessingTime: 0,
+        },
+      };
+      this.registerAgent(agent);
+    }
+
+    agent.isRunning = true;
+    console.log(`[Orchestrator ${this.id}] Agent started: ${payload.agentId}`);
+  }
+
+  private resolveTemplateForTask(taskType: string): string {
+    switch (taskType) {
+      case "file_analysis":
+        return "file_analyzer";
+      case "wordpress_upload":
+        return "wp_uploader";
+      case "moltbook_post":
+        return "moltbook_bot";
+      default:
+        return "general_assistant";
     }
   }
 
