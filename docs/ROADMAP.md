@@ -2,6 +2,8 @@
 
 > From initial framework to emergent consciousness
 
+> Note: `✅` in this document means the module/prototype exists. It does not always mean production-wired integration is complete.
+
 ---
 
 ## Phase 0.5: Foundation ✅ (Completed)
@@ -77,7 +79,7 @@
 
 ---
 
-## Phase 2: OpenClaw Integration ✅ (Completed)
+## Phase 2: OpenClaw Integration 🚧 (In Progress)
 
 **Goal:** Integrate HiveMind with OpenClaw's existing infrastructure
 
@@ -87,11 +89,13 @@
 - [x] Multi-agent session management
 - [x] Session history tracking (JSONL format)
 
-### 2.2 Gateway Integration ✅
-- [x] Connect to OpenClaw Gateway WebSocket (simulated)
+### 2.2 Gateway Integration 🚧
+- [x] Connect to OpenClaw Gateway WebSocket
 - [x] Message routing via HiveGatewayBridge
 - [x] Protocol compatibility (EventFrame, RequestFrame)
 - [x] Authentication (token support, device auth)
+- [x] Wire Hive startup path into OpenClaw config/CLI surface (`gateway.hive.*`, `gateway run --hive`)
+- [x] Unify HiveManager and HiveGatewayBridge lifecycle to avoid duplicate InterfaceAgent startup
 
 ### 2.3 Tools Integration ✅
 - [x] OpenClaw Tools access for agents (21 tools)
@@ -99,16 +103,16 @@
 - [x] Tool usage tracking (history, statistics)
 - [x] Custom tool registration (template-based)
 
-### 2.4 LLM Runtime Integration ✅
-- [x] Connect to OpenClaw ModelProvider (simulated)
+### 2.4 LLM Runtime Integration 🚧
+- [x] Connect to OpenClaw model-compatible HTTP endpoint
 - [x] Model tier configuration (nano/light/standard/heavy)
 - [x] Token counting and billing
 - [x] Error handling and retries (basic implementation)
 
 **Success Criteria:**
-- [x] HiveMind works with OpenClaw Gateway
+- [ ] HiveMind works with OpenClaw Gateway in default runtime path
 - [x] Agents use OpenClaw Tools
-- [x] LLM calls go through OpenClaw runtime
+- [x] LLM calls go through OpenClaw-compatible runtime endpoint
 - [x] Session data persists correctly
 
 ---

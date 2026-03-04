@@ -5,6 +5,7 @@
  */
 
 import { getGlobalEventBus } from '../events/EventBus.js';
+import { randomUUID } from 'node:crypto';
 import type { Event } from '../events/Event.js';
 import { EventType } from '../events/Event.js';
 import type { HiveConfig } from './HiveConfig.js';
@@ -532,7 +533,7 @@ export class AgentCommunication {
    * 生成消息 ID
    */
   private generateMessageId(): string {
-    return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `msg_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`;
   }
 
   /**

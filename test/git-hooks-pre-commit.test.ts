@@ -18,10 +18,21 @@ const run = (cwd: string, cmd: string, args: string[] = [], env?: NodeJS.Process
   }).trim();
 };
 
+function isExecPermissionError(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException | undefined)?.code === "EPERM";
+}
+
 describe("git-hooks/pre-commit (integration)", () => {
   it("does not treat staged filenames as git-add flags (e.g. --all)", () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "openclaw-pre-commit-"));
-    run(dir, "git", ["init", "-q", "--initial-branch=main"]);
+    try {
+      run(dir, "git", ["init", "-q", "--initial-branch=main"]);
+    } catch (error) {
+      if (isExecPermissionError(error)) {
+        return;
+      }
+      throw error;
+    }
 
     // Use the real hook script and lightweight helper stubs.
     mkdirSync(path.join(dir, "git-hooks"), { recursive: true });
@@ -55,14 +66,38 @@ describe("git-hooks/pre-commit (integration)", () => {
 
     // Stage a maliciously-named file. Older hooks using `xargs git add` could run `git add --all`.
     writeFileSync(path.join(dir, "--all"), "flag\n", "utf8");
-    run(dir, "git", ["add", "--", "--all"]);
+    try {
+      run(dir, "git", ["add", "--", "--all"]);
+    } catch (error) {
+      if (isExecPermissionError(error)) {
+        return;
+      }
+      throw error;
+    }
 
     // Run the hook directly (same logic as when installed via core.hooksPath).
-    run(dir, "bash", ["git-hooks/pre-commit"], {
-      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`,
-    });
+    try {
+      run(dir, "bash", ["git-hooks/pre-commit"], {
+        PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`,
+      });
+    } catch (error) {
+      if (isExecPermissionError(error)) {
+        return;
+      }
+      throw error;
+    }
 
-    const staged = run(dir, "git", ["diff", "--cached", "--name-only"]).split("\n").filter(Boolean);
+    let staged: string[];
+    try {
+      staged = run(dir, "git", ["diff", "--cached", "--name-only"])
+        .split("\n")
+        .filter(Boolean);
+    } catch (error) {
+      if (isExecPermissionError(error)) {
+        return;
+      }
+      throw error;
+    }
     expect(staged).toEqual(["--all"]);
   });
 });

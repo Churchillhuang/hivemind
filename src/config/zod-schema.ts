@@ -652,6 +652,13 @@ export const OpenClawSchema = z
           })
           .strict()
           .optional(),
+        hive: z
+          .object({
+            enabled: z.boolean().optional(),
+            mode: z.union([z.literal("single"), z.literal("multi")]).optional(),
+          })
+          .strict()
+          .optional(),
         channelHealthCheckMinutes: z.number().int().min(0).optional(),
         tailscale: z
           .object({

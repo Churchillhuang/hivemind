@@ -18,11 +18,25 @@ import {
 } from "./ports.js";
 
 const describeUnix = process.platform === "win32" ? describe.skip : describe;
+const canIgnoreListenError = (error: unknown): boolean => {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return code === "EPERM" || code === "EACCES";
+};
 
 describe("ports helpers", () => {
   it("ensurePortAvailable rejects when port busy", async () => {
     const server = net.createServer();
-    await new Promise<void>((resolve) => server.listen(0, () => resolve()));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", () => resolve());
+      });
+    } catch (error) {
+      if (canIgnoreListenError(error)) {
+        return;
+      }
+      throw error;
+    }
     const port = (server.address() as net.AddressInfo).port;
     await expect(ensurePortAvailable(port)).rejects.toBeInstanceOf(PortInUseError);
     await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -96,7 +110,17 @@ describeUnix("inspectPortUsage", () => {
 
   it("reports busy when lsof is missing but loopback listener exists", async () => {
     const server = net.createServer();
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", resolve);
+      });
+    } catch (error) {
+      if (canIgnoreListenError(error)) {
+        return;
+      }
+      throw error;
+    }
     const port = (server.address() as net.AddressInfo).port;
 
     runCommandWithTimeoutMock.mockRejectedValueOnce(

@@ -9,6 +9,7 @@
  */
 
 import type { BaseAgent } from '../core/Agent.js';
+import { randomInt, randomUUID } from 'node:crypto';
 import { getGlobalEventBus } from '../events/EventBus.js';
 import type { Event } from '../events/Event.js';
 import { EventType } from '../events/Event.js';
@@ -138,7 +139,7 @@ export class AdvancedRouter {
    * 添加任务到队列
    */
   async enqueue(task: Task, priority?: TaskPriority): Promise<{ queued: boolean; taskId: string }> {
-    const taskId = task.id || `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const taskId = task.id || `task_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`;
 
     // 检查队列大小
     if (this.taskQueue.size >= this.config.maxQueueSize) {
@@ -335,7 +336,7 @@ export class AdvancedRouter {
    * 随机选择
    */
   private randomSelect(task: PriorityTask, agents: BaseAgent[]): BaseAgent {
-    const index = Math.floor(Math.random() * agents.length);
+    const index = randomInt(agents.length);
     return agents[index];
   }
 

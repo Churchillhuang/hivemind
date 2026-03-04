@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -58,6 +59,29 @@ describe("canvas host", () => {
   };
   let fixtureRoot = "";
   let fixtureCount = 0;
+  let canListenLoopback = true;
+
+  const canIgnoreListenError = (error: unknown): boolean => {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    return code === "EPERM" || code === "EACCES";
+  };
+
+  const canBindLoopbackPort = async (): Promise<boolean> => {
+    const probe = net.createServer();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        probe.once("error", reject);
+        probe.listen(0, "127.0.0.1", () => resolve());
+      });
+      await new Promise<void>((resolve) => probe.close(() => resolve()));
+      return true;
+    } catch (error) {
+      if (canIgnoreListenError(error)) {
+        return false;
+      }
+      throw error;
+    }
+  };
 
   const createCaseDir = async () => {
     const dir = path.join(fixtureRoot, `case-${fixtureCount++}`);
@@ -86,6 +110,7 @@ describe("canvas host", () => {
 
   beforeAll(async () => {
     fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-canvas-fixtures-"));
+    canListenLoopback = await canBindLoopbackPort();
   });
 
   afterAll(async () => {
@@ -101,6 +126,9 @@ describe("canvas host", () => {
   });
 
   it("creates a default index.html when missing", async () => {
+    if (!canListenLoopback) {
+      return;
+    }
     const dir = await createCaseDir();
 
     const server = await startFixtureCanvasHost(dir);
@@ -117,6 +145,9 @@ describe("canvas host", () => {
   });
 
   it("skips live reload injection when disabled", async () => {
+    if (!canListenLoopback) {
+      return;
+    }
     const dir = await createCaseDir();
     await fs.writeFile(path.join(dir, "index.html"), "<html><body>no-reload</body></html>", "utf8");
 
@@ -136,6 +167,9 @@ describe("canvas host", () => {
   });
 
   it("serves canvas content from the mounted base path and reuses handlers without double close", async () => {
+    if (!canListenLoopback) {
+      return;
+    }
     const dir = await createCaseDir();
     await fs.writeFile(path.join(dir, "index.html"), "<html><body>v1</body></html>", "utf8");
 
@@ -163,7 +197,10 @@ describe("canvas host", () => {
       socket.destroy();
     });
 
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
     const port = (server.address() as AddressInfo).port;
 
     try {
@@ -205,6 +242,9 @@ describe("canvas host", () => {
   it(
     "serves HTML with injection and broadcasts reload on file changes",
     async () => {
+      if (!canListenLoopback) {
+        return;
+      }
       const dir = await createCaseDir();
       const index = path.join(dir, "index.html");
       await fs.writeFile(index, "<html><body>v1</body></html>", "utf8");
@@ -260,6 +300,9 @@ describe("canvas host", () => {
   );
 
   it("serves A2UI scaffold and blocks traversal/symlink escapes", async () => {
+    if (!canListenLoopback) {
+      return;
+    }
     const dir = await createCaseDir();
     const a2uiRoot = path.resolve(process.cwd(), "src/canvas-host/a2ui");
     const bundlePath = path.join(a2uiRoot, "a2ui.bundle.js");

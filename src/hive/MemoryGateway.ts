@@ -12,6 +12,7 @@
  */
 
 import { BaseAgent } from '../core/Agent.js';
+import { randomUUID } from 'node:crypto';
 import { Event, EventType } from '../events/Event.js';
 import { EventBus } from '../events/EventBus.js';
 import type { HiveConfig } from '../hive/HiveConfig.js';
@@ -350,7 +351,7 @@ export class MemoryGateway extends BaseAgent {
     }
 
     // Write to temp file
-    const tmpFile = `${fullPath}.tmp.${Date.now()}.${Math.random().toString(16).slice(2)}`;
+    const tmpFile = `${fullPath}.tmp.${Date.now()}.${randomUUID()}`;
     await fs.writeFile(tmpFile, content, 'utf-8');
 
     // Atomic rename
@@ -428,7 +429,7 @@ export class MemoryGateway extends BaseAgent {
 
       // Extract lines if requested
       if (request.options?.fromLine !== undefined) {
-        const lines = content!.split('\n');
+        const lines = content.split('\n');
         const from = request.options.fromLine;
         const to = request.options.toLine ?? lines.length;
         content = lines.slice(from, to).join('\n');

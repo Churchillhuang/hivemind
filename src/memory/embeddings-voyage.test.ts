@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "../agents/model-auth.js";
+import { mockPinnedHostnameResolution } from "../test-helpers/ssrf.js";
 import { type FetchMock, withFetchPreconnect } from "../test-utils/fetch-mock.js";
 import { createVoyageEmbeddingProvider, normalizeVoyageModel } from "./embeddings-voyage.js";
 
@@ -42,6 +43,10 @@ async function createDefaultVoyageProvider(
 }
 
 describe("voyage embedding provider", () => {
+  beforeEach(() => {
+    mockPinnedHostnameResolution();
+  });
+
   afterEach(() => {
     vi.resetAllMocks();
     vi.unstubAllGlobals();

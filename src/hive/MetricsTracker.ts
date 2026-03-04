@@ -5,6 +5,7 @@
  */
 
 import type { Event } from '../events/Event.js';
+import { randomUUID } from 'node:crypto';
 
 /**
  * 性能指标
@@ -26,7 +27,7 @@ export interface BehaviorPattern {
   agentId: string;
   patternType: 'repetitive' | 'sequential' | 'parallel' | 'random';
   frequency: number;  // events/min
-  patternDetails: Record<string, any>;
+  patternDetails: Record<string, unknown>;
   confidence: number;  // 0-1
 }
 
@@ -220,7 +221,7 @@ export class MetricsTracker {
    */
   private createAnomaly(agentId: string, type: Anomaly['type'], severity: Anomaly['severity'], metrics: Record<string, number>): void {
     const anomaly: Anomaly = {
-      id: `anomaly_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      id: `anomaly_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 7)}`,
       agentId,
       type,
       severity,
@@ -269,7 +270,7 @@ export class MetricsTracker {
 
     // 检测模式类型（简化）
     let patternType: BehaviorPattern['patternType'] = 'random';
-    let patternDetails: Record<string, any> = {};
+    let patternDetails: Record<string, unknown> = {};
     let confidence = 0.5;
 
     // 检测重复模式
@@ -283,7 +284,7 @@ export class MetricsTracker {
 
     // 检测顺序模式
     const isSequential = agentEvents.every((e, i) => {
-      if (i === 0) return true;
+      if (i === 0) {return true;}
       return e.timestamp >= agentEvents[i - 1].timestamp;
     });
     if (isSequential && frequency > 5) {
@@ -329,7 +330,7 @@ export class MetricsTracker {
       anomalies = anomalies.filter(a => !a.resolved);
     }
 
-    return anomalies.sort((a, b) => b.timestamp - a.timestamp);
+    return anomalies.toSorted((a, b) => b.timestamp - a.timestamp);
   }
 
   /**

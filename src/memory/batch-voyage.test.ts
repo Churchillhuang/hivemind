@@ -1,5 +1,6 @@
 import { ReadableStream } from "node:stream/web";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { mockPinnedHostnameResolution } from "../test-helpers/ssrf.js";
 import type { VoyageBatchOutputLine, VoyageBatchRequest } from "./batch-voyage.js";
 import type { VoyageEmbeddingClient } from "./embeddings-voyage.js";
 
@@ -19,6 +20,10 @@ describe("runVoyageEmbeddingBatches", () => {
   afterEach(() => {
     vi.resetAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  beforeEach(() => {
+    mockPinnedHostnameResolution();
   });
 
   const mockClient: VoyageEmbeddingClient = {

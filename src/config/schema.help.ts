@@ -95,6 +95,12 @@ export const FIELD_HELP: Record<string, string> = {
     "Explicit gateway-level tool allowlist when you want a narrow set of tools available at runtime. Use this for locked-down environments where tool scope must be tightly controlled.",
   "gateway.tools.deny":
     "Explicit gateway-level tool denylist to block risky tools even if lower-level policies allow them. Use deny rules for emergency response and defense-in-depth hardening.",
+  "gateway.hive":
+    "Hive runtime startup controls when launching the gateway process, including enablement and run mode. Use this to turn on multi-agent coordination without per-run environment flags.",
+  "gateway.hive.enabled":
+    "Enables Hive runtime initialization during gateway startup when true. Keep disabled by default until your Hive coordination configuration is validated for the target environment.",
+  "gateway.hive.mode":
+    'Hive runtime mode for gateway startup: "single" keeps compatibility semantics, while "multi" starts system-agent coordination components.',
   "gateway.channelHealthCheckMinutes":
     "Interval in minutes for automatic channel health probing and status updates. Use lower intervals for faster detection, or higher intervals to reduce periodic probe noise.",
   "gateway.tailscale":

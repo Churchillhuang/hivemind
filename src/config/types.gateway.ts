@@ -317,6 +317,15 @@ export type GatewayToolsConfig = {
   allow?: string[];
 };
 
+export type GatewayHiveMode = "single" | "multi";
+
+export type GatewayHiveConfig = {
+  /** Enable Hive runtime initialization during `openclaw gateway run`. */
+  enabled?: boolean;
+  /** Hive runtime mode. */
+  mode?: GatewayHiveMode;
+};
+
 export type GatewayConfig = {
   /** Single multiplexed port for Gateway WS + HTTP (default: 18789). */
   port?: number;
@@ -358,6 +367,8 @@ export type GatewayConfig = {
   allowRealIpFallback?: boolean;
   /** Tool access restrictions for HTTP /tools/invoke endpoint. */
   tools?: GatewayToolsConfig;
+  /** Hive runtime integration controls for gateway process startup. */
+  hive?: GatewayHiveConfig;
   /**
    * Channel health monitor interval in minutes.
    * Periodically checks channel health and restarts unhealthy channels.

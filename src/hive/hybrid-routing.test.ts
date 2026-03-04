@@ -8,10 +8,20 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { EventBus } from '../events/EventBus.js';
-import { Orchestrator, RoutingMode } from '../hive/Orchestrator.js';
+import {
+  Orchestrator,
+  RoutingMode,
+  type RoutingDecision,
+  type Task,
+} from '../hive/Orchestrator.js';
 import { NegotiationRouter } from '../hive/NegotiationRouter.js';
 import { CoordinationAgent } from '../hive/CoordinationAgent.js';
 import type { HiveConfig } from '../hive/HiveConfig.js';
+
+type OrchestratorInternals = {
+  makeRoutingDecision(task: Task): RoutingDecision;
+  getRoutingMode(taskType: string): RoutingMode;
+};
 
 describe('Hybrid Routing - Direct vs Negotiated', () => {
   let eventBus: EventBus;
@@ -84,8 +94,8 @@ describe('Hybrid Routing - Direct vs Negotiated', () => {
     await orchestrator.start();
   });
 
-  afterEach(() => {
-    orchestrator.stop();
+  afterEach(async () => {
+    await orchestrator.stop();
     negotiationRouter.stop();
   });
 
@@ -162,7 +172,7 @@ describe('Hybrid Routing - Direct vs Negotiated', () => {
     it('should use predefined routing rules correctly', () => {
       orchestrator.addRoutingRule('custom_task', ['custom_agent_001']);
 
-      const decision: any = (orchestrator as any).makeRoutingDecision({
+      const decision = (orchestrator as unknown as OrchestratorInternals).makeRoutingDecision({
         id: 'test_task',
         type: 'action',
         priority: 'medium',
@@ -215,7 +225,7 @@ describe('Hybrid Routing - Direct vs Negotiated', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // 检查路由决策
-      const decision: any = (orchestrator as any).makeRoutingDecision({
+      const decision = (orchestrator as unknown as OrchestratorInternals).makeRoutingDecision({
         id: 'test_task_2',
         type: 'action',
         priority: 'medium',
@@ -267,6 +277,50 @@ describe('Hybrid Routing - Direct vs Negotiated', () => {
       expect(assignment).toBeDefined();
     });
 
+    it('should subscribe to negotiation events when router is lazily initialized', async () => {
+      const lazyOrchestrator = new Orchestrator(
+        {
+          id: 'orchestrator_lazy',
+          role: 'Orchestrator',
+          description: 'Lazy negotiation orchestrator',
+        },
+        config,
+        eventBus,
+      );
+
+      await lazyOrchestrator.start();
+
+      // Trigger lazy NegotiationRouter creation through the normal ingress path.
+      await eventBus.publish({
+        type: 'TASK_REQUESTED',
+        sourceAgent: 'test',
+        payload: { taskType: 'file_analysis' },
+      });
+
+      await eventBus.publish({
+        type: 'TASK_ASSIGNED',
+        sourceAgent: 'NegotiationRouter',
+        payload: {
+          taskId: 'task_lazy_1',
+          assignedTo: 'agent_lazy',
+          bidScore: 0.1,
+        },
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const history = eventBus.getHistory();
+      const assignment = history.find(
+        (e) =>
+          e.type === 'TASK_ASSIGNED' &&
+          e.sourceAgent === 'Orchestrator' &&
+          e.payload.assignedTo === 'agent_lazy'
+      );
+
+      expect(assignment).toBeDefined();
+      await lazyOrchestrator.stop();
+    });
+
     it('should handle negotiation failure gracefully', async () => {
       await eventBus.publish({
         type: 'TASK_NEGOTIATION_FAILED',
@@ -288,27 +342,30 @@ describe('Hybrid Routing - Direct vs Negotiated', () => {
 
   describe('Routing Mode Selection', () => {
     it('should correctly identify direct routing tasks', () => {
-      expect((orchestrator as any).getRoutingMode('message')).toBe(RoutingMode.DIRECT);
-      expect((orchestrator as any).getRoutingMode('memory_query')).toBe(RoutingMode.DIRECT);
-      expect((orchestrator as any).getRoutingMode('reflection')).toBe(RoutingMode.DIRECT);
+      const internals = orchestrator as unknown as OrchestratorInternals;
+      expect(internals.getRoutingMode('message')).toBe(RoutingMode.DIRECT);
+      expect(internals.getRoutingMode('memory_query')).toBe(RoutingMode.DIRECT);
+      expect(internals.getRoutingMode('reflection')).toBe(RoutingMode.DIRECT);
     });
 
     it('should correctly identify negotiated routing tasks', () => {
-      expect((orchestrator as any).getRoutingMode('file_analysis')).toBe(RoutingMode.NEGOTIATED);
-      expect((orchestrator as any).getRoutingMode('data_processing')).toBe(RoutingMode.NEGOTIATED);
-      expect((orchestrator as any).getRoutingMode('complex_task')).toBe(RoutingMode.NEGOTIATED);
+      const internals = orchestrator as unknown as OrchestratorInternals;
+      expect(internals.getRoutingMode('file_analysis')).toBe(RoutingMode.NEGOTIATED);
+      expect(internals.getRoutingMode('data_processing')).toBe(RoutingMode.NEGOTIATED);
+      expect(internals.getRoutingMode('complex_task')).toBe(RoutingMode.NEGOTIATED);
     });
 
     it('should allow runtime modification of routing mode', () => {
-      expect((orchestrator as any).getRoutingMode('file_analysis')).toBe(RoutingMode.NEGOTIATED);
+      const internals = orchestrator as unknown as OrchestratorInternals;
+      expect(internals.getRoutingMode('file_analysis')).toBe(RoutingMode.NEGOTIATED);
 
       // 设置为 direct
       orchestrator.setDirectRoutingTask('file_analysis', true);
-      expect((orchestrator as any).getRoutingMode('file_analysis')).toBe(RoutingMode.DIRECT);
+      expect(internals.getRoutingMode('file_analysis')).toBe(RoutingMode.DIRECT);
 
       // 设置回 negotiated
       orchestrator.setDirectRoutingTask('file_analysis', false);
-      expect((orchestrator as any).getRoutingMode('file_analysis')).toBe(RoutingMode.NEGOTIATED);
+      expect(internals.getRoutingMode('file_analysis')).toBe(RoutingMode.NEGOTIATED);
     });
   });
 

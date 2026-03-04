@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 /**
  * Hive Modes - 支持传统单 Agent 模式和 HiveMind 多 Agent 模式
  */
@@ -166,7 +168,7 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
   stateMachine: {
     persist: true,
     checkpointInterval: 10000,
-    checkpointPath: '/var/lib/hivemind/state.json',
+    checkpointPath: path.join(process.cwd(), ".hivemind", "state.json"),
   },
   agents: {
     system: {
@@ -204,8 +206,8 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
     indexing: {
       enableSemanticSearch: true,
       enableVectorCache: true,
-      workspacePath: '/path/to/openclaw/workspace',
-      memoryPath: '/path/to/openclaw/workspace/memory',
+      workspacePath: process.cwd(),
+      memoryPath: path.join(process.cwd(), "memory"),
     },
   },
 

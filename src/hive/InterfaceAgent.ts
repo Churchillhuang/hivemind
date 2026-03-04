@@ -5,8 +5,9 @@
  */
 
 import { BaseAgent } from '../core/Agent.js';
+import { randomUUID } from 'node:crypto';
 import { Event, EventType } from '../events/Event.js';
-import { EventBus } from '../events/EventBus.js';
+import { EventBus, getGlobalEventBus } from '../events/EventBus.js';
 import type { HiveConfig } from '../hive/HiveConfig.js';
 
 export interface Message {
@@ -27,7 +28,6 @@ export interface AgentResponse {
 }
 
 export class InterfaceAgent extends BaseAgent {
-  private eventBus: EventBus;
   private pendingRequests: Map<string, {
     resolve: (value: AgentResponse) => void;
     reject: (err: Error) => void;
@@ -37,7 +37,7 @@ export class InterfaceAgent extends BaseAgent {
 
   constructor(
     config: { id: string; role: string; description?: string },
-    hiveConfig: HiveConfig,
+    _hiveConfig: HiveConfig,
     eventBus?: EventBus,
   ) {
     super({
@@ -50,7 +50,7 @@ export class InterfaceAgent extends BaseAgent {
     this.eventBus = eventBus || getGlobalEventBus();
 
     // 订阅事件
-    this.subscribeTo(EventType.NEW_MESSAGE);      // 处理新消息
+    this.subscribeTo(EventType.TASK_ASSIGNED);
     this.subscribeTo(EventType.MESSAGE_PROCESSED);
     this.subscribeTo(EventType.MEMORY_RESULT);
     this.subscribeTo(EventType.AGENT_ERROR);
@@ -79,9 +79,9 @@ export class InterfaceAgent extends BaseAgent {
     }
 
     // 清理待处理的请求
-    for (const [messageId, { reject }] of this.pendingRequests.entries()) {
-      clearTimeout(reject as unknown as NodeJS.Timeout);
-      reject(new Error('Agent is stopping'));
+    for (const [messageId, pending] of this.pendingRequests.entries()) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error('Agent is stopping'));
       this.pendingRequests.delete(messageId);
     }
 
@@ -99,20 +99,19 @@ export class InterfaceAgent extends BaseAgent {
 
   async handle(event: Event): Promise<void> {
     switch (event.type) {
-      case EventType.NEW_MESSAGE:
-        // MVP: InterfaceAgent 处理自己发布的消息
-        await this.handleNewMessage(event);
+      case 'TASK_ASSIGNED':
+        await this.handleTaskAssigned(event);
         break;
 
-      case EventType.MESSAGE_PROCESSED:
+      case 'MESSAGE_PROCESSED':
         await this.handleMessageProcessed(event);
         break;
 
-      case EventType.MEMORY_RESULT:
+      case 'MEMORY_RESULT':
         await this.handleMemoryResult(event);
         break;
 
-      case EventType.AGENT_ERROR:
+      case 'AGENT_ERROR':
         await this.handleAgentError(event);
         break;
     }
@@ -120,8 +119,44 @@ export class InterfaceAgent extends BaseAgent {
 
   // Private event handlers
 
-  private async handleNewMessage(event: Event): Promise<void> {
-    const message = event.payload as Message;
+  private async handleTaskAssigned(event: Event): Promise<void> {
+    const assignment = event.payload as {
+      taskId?: string;
+      assignedTo?: string;
+      taskData?: unknown;
+    };
+    if (assignment.assignedTo !== this.id) {
+      return;
+    }
+
+    const taskData = assignment.taskData;
+    if (typeof taskData !== 'object' || taskData === null) {
+      return;
+    }
+
+    const record = taskData as Record<string, unknown>;
+    const message = this.coerceMessage(record, assignment.taskId);
+    await this.handleNewMessage(message, event.correlationId);
+  }
+
+  private coerceMessage(record: Record<string, unknown>, fallbackId?: string): Message {
+    return {
+      id:
+        typeof record.id === 'string'
+          ? record.id
+          : fallbackId || `msg_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
+      content: typeof record.content === 'string' ? record.content : JSON.stringify(record),
+      userId: typeof record.userId === 'string' ? record.userId : undefined,
+      channelId: typeof record.channelId === 'string' ? record.channelId : undefined,
+      timestamp: typeof record.timestamp === 'number' ? record.timestamp : Date.now(),
+      metadata:
+        typeof record.metadata === 'object' && record.metadata !== null
+          ? (record.metadata as Record<string, unknown>)
+          : undefined,
+    };
+  }
+
+  private async handleNewMessage(message: Message, correlationId?: string): Promise<void> {
 
     console.log(`[InterfaceAgent ${this.id}] Processing message:`, message);
 
@@ -148,7 +183,7 @@ export class InterfaceAgent extends BaseAgent {
         type: EventType.MESSAGE_PROCESSED,
         sourceAgent: this.id,
         payload: response,
-        correlationId: event.correlationId,
+        correlationId,
       });
 
       console.log(`[InterfaceAgent ${this.id}] Response published:`, content);
@@ -216,7 +251,7 @@ export class InterfaceAgent extends BaseAgent {
     limit?: number;
     context?: string;
   }): Promise<unknown> {
-    const requestId = `mem_req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const requestId = `mem_req_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`;
 
     // 发布查询请求 - 指定记忆层级
     await this.eventBus.publish({
@@ -254,7 +289,7 @@ export class InterfaceAgent extends BaseAgent {
 
   // Private event handlers
 
-  private async handleMessageProcessed(event: Event): void {
+  private async handleMessageProcessed(event: Event): Promise<void> {
     const response = event.payload as AgentResponse;
 
     console.log(`[InterfaceAgent ${this.id}] Handling MESSAGE_PROCESSED for message ${response.messageId}`);
@@ -270,7 +305,7 @@ export class InterfaceAgent extends BaseAgent {
     }
   }
 
-  private async handleMemoryResult(event: Event): void {
+  private async handleMemoryResult(event: Event): Promise<void> {
     const result = event.payload as {
       requestId: string;
       data: unknown;
@@ -280,7 +315,7 @@ export class InterfaceAgent extends BaseAgent {
     console.log(`[InterfaceAgent ${this.id}] Memory result received:`, result);
   }
 
-  private async handleAgentError(event: Event): void {
+  private async handleAgentError(event: Event): Promise<void> {
     console.error(`[InterfaceAgent ${this.id}] Agent error:`, event.payload);
 
     // 如果某个 agent 出错，可能需要清理相关的 pending request

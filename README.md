@@ -24,11 +24,11 @@ Rather than designing a "self" module directly, HiveMind implements agent coordi
 
 ### Current Status
 
-**Experimental research**
+**Experimental research prototype**
 
-- All 6 phases implemented (20 components)
-- Basic coordination, evolution, optimization, and observation mechanisms
-- Whether emergent self arises from coordination is an open question
+- Most Hive modules exist as prototypes
+- Core routing/memory tests are passing, but full integration is still in progress
+- Whether emergent self arises from coordination remains an open research question
 
 **Next step: Run and observe**
 
@@ -141,18 +141,18 @@ The system implements tracking for emergent properties:
 
 | Phase | Status | Components |
 |-------|--------|-----------|
-| **0.5** | ✅ Complete | 2 |
-| **1** | ✅ Complete | 10 |
-| **2** | ✅ Complete | 4 |
-| **3** | ✅ Complete | 3 |
-| **4** | ✅ Complete | 3 |
-| **5** | ✅ Complete | 3 |
-| **6** | ✅ Complete | 3 |
-| **Total** | ** implemented** | **20** |
+| **0.5** | ✅ Base framework landed | 2 |
+| **1** | ✅ Core Hive prototype | 10 |
+| **2** | ⚠️ Integration in progress | 4 |
+| **3** | ⚠️ Prototype only | 3 |
+| **4** | ⚠️ Prototype only | 3 |
+| **5** | ⚠️ Prototype only | 3 |
+| **6** | ⏳ Pending | 3 |
+| **Total** | **prototype coverage** | **20** |
 
 ### Implementation
 
-All 6 phases implemented with 20 core components.
+20 core components are present, but not all are production-wired end-to-end yet.
 
 ---
 

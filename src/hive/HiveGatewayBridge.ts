@@ -7,7 +7,7 @@
 
 import { EventBus, getGlobalEventBus } from '../events/EventBus.js';
 import { EventType } from '../events/Event.js';
-import { InterfaceAgent, type Message, type AgentResponse } from '../hive/InterfaceAgent.js';
+import { InterfaceAgent, type Message } from '../hive/InterfaceAgent.js';
 import type { HiveConfig } from '../hive/HiveConfig.js';
 
 /**
@@ -34,6 +34,7 @@ export interface OutboundMessage {
 export interface GatewayBridgeOptions {
   hiveConfig: HiveConfig;
   eventBus?: EventBus;
+  interfaceAgent?: InterfaceAgent;
   // TODO: 添加实际的 Gateway 引用
   // originalHandler?: (msg: InboundMessage) => Promise<OutboundMessage>;
 }
@@ -42,11 +43,13 @@ export class HiveGatewayBridge {
   private eventBus: EventBus;
   private hiveConfig: HiveConfig;
   private interfaceAgent?: InterfaceAgent;
+  private ownsInterfaceAgent = false;
   private initialized = false;
 
   constructor(options: GatewayBridgeOptions) {
     this.hiveConfig = options.hiveConfig;
     this.eventBus = options.eventBus || getGlobalEventBus();
+    this.interfaceAgent = options.interfaceAgent;
   }
 
   /**
@@ -57,19 +60,23 @@ export class HiveGatewayBridge {
       return;
     }
 
-    // 创建 Interface Agent
-    this.interfaceAgent = new InterfaceAgent(
-      {
-        id: 'interface_agent_001',
-        role: 'Interface Agent',
-        description: '处理用户对话的主接口 Agent',
-      },
-      this.hiveConfig,
-      this.eventBus,
-    );
+    if (!this.interfaceAgent) {
+      // 默认行为：Bridge 自己管理 InterfaceAgent 生命周期
+      this.interfaceAgent = new InterfaceAgent(
+        {
+          id: 'interface_agent_001',
+          role: 'Interface Agent',
+          description: '处理用户对话的主接口 Agent',
+        },
+        this.hiveConfig,
+        this.eventBus,
+      );
+      this.ownsInterfaceAgent = true;
+    }
 
-    // 启动 Agent
-    await this.interfaceAgent.start();
+    if (!this.interfaceAgent.isRunning()) {
+      await this.interfaceAgent.start();
+    }
 
     this.initialized = true;
 
@@ -182,7 +189,7 @@ export class HiveGatewayBridge {
       return;
     }
 
-    if (this.interfaceAgent) {
+    if (this.interfaceAgent && this.ownsInterfaceAgent) {
       await this.interfaceAgent.stop();
     }
 

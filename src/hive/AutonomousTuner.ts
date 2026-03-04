@@ -39,7 +39,7 @@ export interface StrategyConfig {
   loadBalancingEnabled: boolean;
   autoScalingEnabled: boolean;
   costOptimizationLevel: number;  // 0-1
-  performance prioritizationLevel: number;  // 0-1
+  performancePrioritizationLevel: number;  // 0-1
 }
 
 /**
@@ -308,7 +308,7 @@ export class AutonomousTuner {
           break;
         }
       }
-      if (currentTier !== 'standard') break;
+      if (currentTier !== 'standard') {break;}
     }
 
     // 选择下一层级的模型
@@ -375,9 +375,6 @@ export class AutonomousTuner {
     durationMs: number = 60000,
   ): Promise<ABTestResult> {
     console.log(`[Tuner] Starting A/B test: ${testName} (${parameterName}: ${variantA} vs ${variantB})`);
-
-    // 获取初始性能
-    const initialMetrics = this.metricsTracker.getSummary();
 
     // 应用 variant A
     const param = this.parameters.get(parameterName);
@@ -514,7 +511,7 @@ export class AutonomousTuner {
    * 获取调优历史
    */
   getTuningHistory(limit?: number): TuningResult[] {
-    let history = [...this.tuningHistory].reverse();
+    let history = [...this.tuningHistory].toReversed();
     return limit ? history.slice(0, limit) : history;
   }
 

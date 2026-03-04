@@ -11,14 +11,15 @@
  * This is the main entry point for HiveMind.
  */
 
-import { EventBus, getGlobalEventBus } from './EventBus.js';
-import { EventType } from './Event.js';
+import { EventBus, getGlobalEventBus } from '../events/EventBus.js';
+import { EventType } from '../events/Event.js';
 import type { HiveConfig } from '../hive/HiveConfig.js';
 import { Orchestrator } from '../hive/Orchestrator.js';
 import { InterfaceAgent } from '../hive/InterfaceAgent.js';
 import { MemoryAgent } from '../hive/MemoryAgent.js';
 import { ReflectionAgent } from '../hive/ReflectionAgent.js';
 import { MemoryGateway } from '../hive/MemoryGateway.js';
+import { HiveGatewayBridge } from '../hive/HiveGatewayBridge.js';
 
 export interface HiveManagerOptions {
   hiveConfig: HiveConfig;
@@ -36,6 +37,7 @@ export class HiveManager {
   private memoryAgent?: MemoryAgent;
   private memoryGateway?: MemoryGateway;
   private reflectionAgent?: ReflectionAgent;
+  private gatewayBridge?: HiveGatewayBridge;
 
   constructor(options: HiveManagerOptions) {
     this.hiveConfig = options.hiveConfig;
@@ -183,6 +185,10 @@ export class HiveManager {
     // Stop in reverse order, using destroy() to ensure proper cleanup
     const stopPromises: Promise<void>[] = [];
 
+    if (this.gatewayBridge) {
+      stopPromises.push(this.gatewayBridge.shutdown());
+    }
+
     if (this.reflectionAgent) {
       stopPromises.push(this.reflectionAgent.destroy());
     }
@@ -211,6 +217,7 @@ export class HiveManager {
     this.memoryAgent = undefined;
     this.orchestrator = undefined;
     this.memoryGateway = undefined;
+    this.gatewayBridge = undefined;
 
     this.initialized = false;
 
@@ -233,6 +240,7 @@ export class HiveManager {
       memory: this.memoryAgent,
       memoryGateway: this.memoryGateway,
       reflection: this.reflectionAgent,
+      gatewayBridge: this.gatewayBridge,
     };
   }
 
@@ -248,9 +256,39 @@ export class HiveManager {
         memory: this.memoryAgent?.isRunning() ?? false,
         memoryGateway: this.memoryGateway?.isRunning() ?? false,
         reflection: this.reflectionAgent?.isRunning() ?? false,
+        gatewayBridge: this.gatewayBridge?.getStatus().initialized ?? false,
       },
       config: this.hiveConfig,
     };
+  }
+
+  /**
+   * Ensure GatewayBridge exists and is initialized.
+   * Bridge reuses the manager-owned InterfaceAgent to avoid duplicate listeners.
+   */
+  async ensureGatewayBridge(): Promise<HiveGatewayBridge> {
+    if (!this.initialized) {
+      throw new Error('HiveManager must be initialized before creating GatewayBridge');
+    }
+
+    if (!this.interfaceAgent) {
+      throw new Error('InterfaceAgent is not available; cannot create GatewayBridge');
+    }
+
+    if (!this.gatewayBridge) {
+      this.gatewayBridge = new HiveGatewayBridge({
+        hiveConfig: this.hiveConfig,
+        eventBus: this.eventBus,
+        interfaceAgent: this.interfaceAgent,
+      });
+    }
+
+    const bridgeStatus = this.gatewayBridge.getStatus();
+    if (!bridgeStatus.initialized) {
+      await this.gatewayBridge.initialize();
+    }
+
+    return this.gatewayBridge;
   }
 
   /**

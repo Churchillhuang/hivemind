@@ -5,6 +5,7 @@
  */
 
 import { BaseAgent, type AgentConfig } from '../core/Agent.js';
+import { randomUUID } from 'node:crypto';
 import { Event, EventType } from '../events/Event.js';
 import { EventBus } from '../events/EventBus.js';
 import type { HiveConfig } from '../hive/HiveConfig.js';
@@ -245,7 +246,7 @@ export class AgentFactory extends BaseAgent {
     }
 
     // 生成实例 ID
-    const instanceId = request.agentId || `${template.type}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const instanceId = request.agentId || `${template.type}_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 6)}`;
 
     // 创建实例
     const instance: AgentInstance = {

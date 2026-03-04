@@ -5,11 +5,9 @@
  */
 
 import type { HiveConfig } from './HiveConfig.js';
+import { randomUUID } from 'node:crypto';
 import type {
-  getAgentModelConfig,
   ModelUsage,
-  estimateCost,
-  estimateLatency,
 } from '../utils/ModelConfig.js';
 
 /**
@@ -145,8 +143,7 @@ export class LLMRuntime {
     console.log(`  Temperature: ${temperature}`);
     console.log(`  Max Tokens: ${maxTokens}`);
 
-    // 模拟 LLM 调用（实际应该调用 OpenClaw 的 ModelProvider）
-    const response = await this.simulateLLMCall(params, modelUsage, startTime);
+    const response = await this.callGatewayOpenAiCompat(params, modelUsage, timeout);
 
     // 计算成本
     if (opts.enableCostTracking !== false) {
@@ -172,71 +169,147 @@ export class LLMRuntime {
   }
 
   /**
-   * 模拟 LLM 调用（实际应该调用 OpenClaw）
+   * 调用 Gateway 提供的 OpenAI 兼容接口
    */
-  private async simulateLLMCall(
+  private async callGatewayOpenAiCompat(
     params: LLMRequestParams,
     modelUsage: ModelUsage,
-    startTime: number,
+    timeoutMs: number,
   ): Promise<LLMResponse> {
-    // 模拟处理时间
-    const processingTime = Math.random() * 1000 + 500;
-    await new Promise(resolve => setTimeout(resolve, processingTime));
-
-    // 估算 prompt tokens（简化）
-    let promptTokens = 0;
-    for (const msg of params.messages) {
-      const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-      promptTokens += Math.ceil(content.length / 4);  // 大约 4 字符 = 1 token
-    }
-
-    // 估算 completion tokens（生成一些文本）
-    const lastUserMsg = params.messages.filter(m => m.role === 'user').pop();
-    let content = '';
-    if (lastUserMsg) {
-      const userContent = typeof lastUserMsg.content === 'string' ? lastUserMsg.content : '';
-      content = `[LLM Response to: "${userContent.substring(0, 50)}..."]`;
-    } else {
-      content = '[LLM Response]';
-    }
-
-    const completionTokens = Math.ceil(content.length / 4);
-
-    // 确定模型
     const model = params.model || modelUsage.modelName;
+    const gatewayBase = this.resolveGatewayHttpBase();
+    const endpoint = `${gatewayBase}/v1/chat/completions`;
+    const token =
+      process.env.OPENCLAW_GATEWAY_TOKEN ||
+      process.env.CLAWDBOT_GATEWAY_TOKEN ||
+      process.env.OPENCLAW_TOKEN;
 
-    // 检测 provider
-    const provider = this.detectProvider(model);
+    const body = {
+      model,
+      stream: false,
+      temperature: params.temperature ?? modelUsage.temperature,
+      max_tokens: params.maxTokens ?? modelUsage.maxTokens,
+      messages: params.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
+      tools: params.tools?.map((tool) => ({
+        type: 'function',
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+        },
+      })),
+    };
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Gateway LLM request failed (${response.status}): ${text.slice(0, 300)}`,
+      );
+    }
+
+    const payload = await response.json() as {
+      id?: string;
+      model?: string;
+      choices?: Array<{
+        finish_reason?: string;
+        message?: {
+          content?: string;
+          tool_calls?: Array<{
+            id?: string;
+            type?: string;
+            function?: { name?: string; arguments?: string };
+          }>;
+        };
+      }>;
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+      };
+    };
+
+    const choice = payload.choices?.[0];
+    const content = choice?.message?.content ?? '';
+    const promptTokens = payload.usage?.prompt_tokens ?? this.estimateTokens(params.messages);
+    const completionTokens = payload.usage?.completion_tokens ?? this.estimateTokens(content);
+    const totalTokens =
+      payload.usage?.total_tokens ?? promptTokens + completionTokens;
+
+    const toolCalls: LLMToolCall[] | undefined = choice?.message?.tool_calls?.map((entry) => ({
+      id: entry.id || `tool_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
+      type: 'function',
+      function: {
+        name: entry.function?.name || 'unknown',
+        arguments: entry.function?.arguments || '{}',
+      },
+    }));
 
     return {
-      id: `llm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      model,
+      id: payload.id || `llm_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
+      model: payload.model || model,
       content,
-      finishReason: 'stop',
+      finishReason: this.normalizeFinishReason(choice?.finish_reason),
       usage: {
         promptTokens,
         completionTokens,
-        totalTokens: promptTokens + completionTokens,
+        totalTokens,
       },
-      provider,
-    } as LLMResponse & { provider: LLMProvider };
+      ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
+    };
   }
 
-  /**
-   * 检测 LLM provider
-   */
-  private detectProvider(model: string): LLMProvider {
-    if (model.includes('claude') || model.includes('anthropic')) {
-      return 'anthropic';
+  private resolveGatewayHttpBase(): string {
+    const raw =
+      process.env.OPENCLAW_GATEWAY_HTTP_URL ||
+      process.env.OPENCLAW_GATEWAY_URL ||
+      process.env.CLAWDBOT_GATEWAY_URL ||
+      'http://127.0.0.1:18789';
+
+    if (raw.startsWith('ws://')) {
+      return raw.replace(/^ws:\/\//, 'http://');
     }
-    if (model.includes('gpt') || model.includes('openai')) {
-      return 'openai';
+    if (raw.startsWith('wss://')) {
+      return raw.replace(/^wss:\/\//, 'https://');
     }
-    if (model.includes('openrouter')) {
-      return 'openrouter';
+    return raw;
+  }
+
+  private estimateTokens(input: unknown): number {
+    if (typeof input === 'string') {
+      return Math.ceil(input.length / 4);
     }
-    if (model.includes('custom') || model.includes('integrate-api-nvidia')) {
-      return 'custom';
+    return Math.ceil(JSON.stringify(input).length / 4);
+  }
+
+  private normalizeFinishReason(reason: string | undefined): LLMResponse['finishReason'] {
+    if (
+      reason === 'stop' ||
+      reason === 'length' ||
+      reason === 'tool_calls' ||
+      reason === 'content_filter'
+    ) {
+      return reason;
     }
     return 'unknown';
   }

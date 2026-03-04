@@ -5,6 +5,7 @@
  */
 
 import { promises as fs } from 'fs';
+import { randomUUID } from 'node:crypto';
 import path from 'path';
 import type { HiveConfig } from './HiveConfig.js';
 
@@ -246,8 +247,8 @@ export class GlobalStateMachine {
   /**
    * 创建检查点
    */
-  async createCheckpoint(reason?: string): Promise<Checkpoint> {
-    const checkpointId = `ckpt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  async createCheckpoint(_reason?: string): Promise<Checkpoint> {
+    const checkpointId = `ckpt_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`;
 
     // 生成快照
     const stateString = JSON.stringify(this.state);
@@ -348,7 +349,7 @@ export class GlobalStateMachine {
    * 获取转换历史
    */
   getTransitions(limit?: number): StateTransition[] {
-    const transitions = this.transitions.slice().reverse();
+    const transitions = this.transitions.slice().toReversed();
     if (limit) {
       return transitions.slice(0, limit);
     }
@@ -359,7 +360,7 @@ export class GlobalStateMachine {
    * 获取检查点列表
    */
   getCheckpoints(): Checkpoint[] {
-    return Array.from(this.checkpoints.values()).sort((a, b) => b.timestamp - a.timestamp);
+    return Array.from(this.checkpoints.values()).toSorted((a, b) => b.timestamp - a.timestamp);
   }
 
   /**
@@ -466,7 +467,7 @@ export class GlobalStateMachine {
       await this.loadCheckpoints();
 
       console.log(`[GSM] State loaded from: ${statePath} (generation: ${this.state.generation})`);
-    } catch (error) {
+    } catch (_error) {
       console.log(`[GSM] Failed to load state, using initial state`);
     }
   }
@@ -506,7 +507,7 @@ export class GlobalStateMachine {
       }
 
       console.log(`[GSM] Loaded ${this.checkpoints.size} checkpoints`);
-    } catch (error) {
+    } catch (_error) {
       console.log(`[GSM] Failed to load checkpoints`);
     }
   }
@@ -523,7 +524,7 @@ export class GlobalStateMachine {
 
     try {
       await fs.unlink(checkpointPath);
-    } catch (error) {
+    } catch (_error) {
       console.error(`[GSM] Failed to delete checkpoint file: ${checkpointPath}`);
     }
   }

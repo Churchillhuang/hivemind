@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "../agents/model-auth.js";
+import { mockPinnedHostnameResolution } from "../test-helpers/ssrf.js";
 import { DEFAULT_GEMINI_EMBEDDING_MODEL } from "./embeddings-gemini.js";
 import { createEmbeddingProvider, DEFAULT_LOCAL_MODEL } from "./embeddings.js";
 
@@ -35,6 +36,10 @@ function readFirstFetchRequest(fetchMock: { mock: { calls: unknown[][] } }) {
 afterEach(() => {
   vi.resetAllMocks();
   vi.unstubAllGlobals();
+});
+
+beforeEach(() => {
+  mockPinnedHostnameResolution();
 });
 
 function requireProvider(result: Awaited<ReturnType<typeof createEmbeddingProvider>>) {

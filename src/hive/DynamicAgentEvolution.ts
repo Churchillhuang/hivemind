@@ -5,10 +5,10 @@
  */
 
 import { getGlobalEventBus } from '../events/EventBus.js';
+import { randomUUID } from 'node:crypto';
 import type { Event } from '../events/Event.js';
 import { EventType } from '../events/Event.js';
 import type { HiveConfig } from './HiveConfig.js';
-import type { BaseAgent } from '../core/Agent.js';
 
 /**
  * 技能评估
@@ -166,7 +166,7 @@ export class DynamicAgentEvolution {
     const suggestions: EvolutionSuggestion[] = [];
 
     // 评估每个 Agent 的性能
-    for (const [agentId, perf] of this.agentPerformance.entries()) {
+    for (const [_agentId, perf] of this.agentPerformance.entries()) {
       // 计算综合得分
       const score = this.calculatePerformanceScore(perf);
       perf.score = score;
@@ -255,7 +255,7 @@ export class DynamicAgentEvolution {
     }
 
     return {
-      suggestionId: `evol_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      suggestionId: `evol_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
       agentId,
       suggestion: `Consider changing role to "${suggestedRole}"`,
       reason,
@@ -312,7 +312,7 @@ export class DynamicAgentEvolution {
 
     for (const skill of weakSkills) {
       suggestions.push({
-        suggestionId: `skill_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        suggestionId: `skill_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
         agentId: perf.agentId,
         suggestion: `Develop "${skill.name}" skill to improve performance`,
         reason: `Low proficiency (${(skill.proficiency * 100).toFixed(1)}%) and high usage (${skill.usageCount} times) suggest training needed`,
@@ -338,7 +338,7 @@ export class DynamicAgentEvolution {
     }
 
     const adaptation: RoleAdaptation = {
-      adaptationId: `adapt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      adaptationId: `adapt_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
       agentId,
       fromRole: this.inferCurrentRole(perf),
       toRole: newRole,
@@ -390,7 +390,7 @@ export class DynamicAgentEvolution {
    */
   private inferCurrentRole(perf: AgentPerformance): string {
     const skills = Array.from(perf.skills.values());
-    const topSkill = skills.sort((a, b) => b.proficiency - a.proficiency)[0];
+    const topSkill = skills.toSorted((a, b) => b.proficiency - a.proficiency)[0];
 
     if (topSkill) {
       return this.inferRoleFromSkill(topSkill.skillId);

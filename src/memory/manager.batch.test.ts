@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { useFastShortTimeouts } from "../../test/helpers/fast-short-timeouts.js";
+import { mockPinnedHostnameResolution } from "../test-helpers/ssrf.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { getMemorySearchManager, type MemoryIndexManager } from "./index.js";
 import { createOpenAIEmbeddingProviderMock } from "./test-embeddings-mock.js";
@@ -140,6 +141,7 @@ describe("memory indexing with OpenAI batches", () => {
   });
 
   beforeEach(async () => {
+    mockPinnedHostnameResolution();
     embedBatch.mockClear();
     embedQuery.mockClear();
     embedBatch.mockImplementation(async (texts: string[]) =>

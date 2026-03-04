@@ -4,8 +4,8 @@
  * All agents (system and functional) must implement this interface.
  */
 
-import { Event, EventHandler } from '../events/Event.js';
-import { EventBus } from '../events/EventBus.js';
+import { Event } from '../events/Event.js';
+import { EventBus, getGlobalEventBus } from '../events/EventBus.js';
 
 export type AgentType = 'system' | 'functional';
 
@@ -74,7 +74,7 @@ export abstract class BaseAgent implements Agent {
     return this.config.role;
   }
 
-  get type(): string {
+  get type(): AgentType {
     return this.config.type;
   }
 

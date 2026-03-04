@@ -13,6 +13,7 @@
  */
 
 import { BaseAgent } from "../core/Agent.js";
+import { randomUUID } from "node:crypto";
 import { Event, EventType } from "../events/Event.js";
 import { EventBus } from "../events/EventBus.js";
 import type { HiveConfig } from "./HiveConfig.js";
@@ -155,6 +156,10 @@ export class Orchestrator extends BaseAgent {
     if (!this.negotiationRouter) {
       this.negotiationRouter = new NegotiationRouter(this.hiveConfig, this.eventBus);
       this.negotiationRouter.start();
+      // NegotiationRouter can be lazily initialized during routing, so ensure the
+      // orchestrator listens for negotiation outcomes even after start().
+      this.subscribeTo("TASK_ASSIGNED");
+      this.subscribeTo("TASK_NEGOTIATION_FAILED");
       console.log(`[Orchestrator ${this.id}] NegotiationRouter initialized`);
     }
   }
@@ -281,7 +286,7 @@ export class Orchestrator extends BaseAgent {
    * 处理任务分配（协商路由）
    */
   private async handleTaskAssigned(event: Event): Promise<void> {
-    if (event.sourceAgent === this.id) {
+    if (event.sourceAgent === this.id || event.sourceAgent === "Orchestrator") {
       return;
     }
 
@@ -289,6 +294,7 @@ export class Orchestrator extends BaseAgent {
       taskId: string;
       assignedTo: string;
       bidScore: number;
+      taskData?: Record<string, unknown>;
     };
 
     // 查找任务并更新状态
@@ -311,11 +317,13 @@ export class Orchestrator extends BaseAgent {
     }
 
     await this.eventBus?.publish({
-      type: EventType.TASK_CONFIRMED,
+      type: EventType.TASK_ASSIGNED,
       sourceAgent: "Orchestrator",
+      routingMode: "negotiated",
       payload: {
         taskId: assignment.taskId,
         assignedTo: assignment.assignedTo,
+        taskData: task?.payload ?? assignment.taskData ?? {},
       },
     });
 
@@ -362,7 +370,7 @@ export class Orchestrator extends BaseAgent {
    */
   async handleNewMessage(event: Event): Promise<void> {
     const task: Task = {
-      id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `task_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
       type: "message",
       priority: "medium",
       sourceAgent: event.sourceAgent,
@@ -383,7 +391,7 @@ export class Orchestrator extends BaseAgent {
    */
   async handleTaskRequest(event: Event): Promise<void> {
     const task: Task = {
-      id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `task_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`,
       type: "action",
       priority: "medium",
       sourceAgent: event.sourceAgent,
@@ -505,6 +513,7 @@ export class Orchestrator extends BaseAgent {
       payload: {
         taskId: task.id,
         assignedTo: decision.targetAgent,
+        taskData: task.payload,
       },
     });
 
@@ -523,7 +532,7 @@ export class Orchestrator extends BaseAgent {
   }): Promise<void> {
     console.log(`[Orchestrator ${this.id}] Creating agent: ${config.role}`);
 
-    const agentId = `${config.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const agentId = `${config.type}_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`;
 
     // 注册 Agent（实际创建由 AgentFactory 负责，这里先注册）
     this.registerAgent({

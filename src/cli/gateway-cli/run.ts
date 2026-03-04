@@ -9,6 +9,7 @@ import {
   resolveStateDir,
   resolveGatewayPort,
 } from "../../config/config.js";
+import type { OpenClawConfig } from "../../config/types.js";
 import { resolveGatewayAuth } from "../../gateway/auth.js";
 import { startGatewayServer } from "../../gateway/server.js";
 import type { GatewayWsLogStyle } from "../../gateway/ws-logging.js";
@@ -19,6 +20,10 @@ import { formatPortDiagnostics, inspectPortUsage } from "../../infra/ports.js";
 import { setConsoleSubsystemFilter, setConsoleTimestampPrefix } from "../../logging/console.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { defaultRuntime } from "../../runtime.js";
+import { EventBus, getGlobalEventBus } from "../../events/EventBus.js";
+import type { HiveConfig } from "../../hive/HiveConfig.js";
+import { DEFAULT_HIVE_CONFIG } from "../../hive/HiveConfig.js";
+import { HiveManager } from "../../hive/HiveManager.js";
 import { formatCliCommand } from "../command-format.js";
 import { inheritOptionFromParent } from "../command-options.js";
 import { forceFreePortAndWait } from "../ports.js";
@@ -48,6 +53,8 @@ type GatewayRunOpts = {
   compact?: boolean;
   rawStream?: boolean;
   rawStreamPath?: unknown;
+  hive?: boolean;
+  hiveMode?: unknown;
   dev?: boolean;
   reset?: boolean;
 };
@@ -63,6 +70,7 @@ const GATEWAY_RUN_VALUE_KEYS = [
   "tailscale",
   "wsLog",
   "rawStreamPath",
+  "hiveMode",
 ] as const;
 
 const GATEWAY_RUN_BOOLEAN_KEYS = [
@@ -75,6 +83,7 @@ const GATEWAY_RUN_BOOLEAN_KEYS = [
   "claudeCliLogs",
   "compact",
   "rawStream",
+  "hive",
 ] as const;
 
 const GATEWAY_AUTH_MODES: readonly GatewayAuthMode[] = [
@@ -84,6 +93,69 @@ const GATEWAY_AUTH_MODES: readonly GatewayAuthMode[] = [
   "trusted-proxy",
 ];
 const GATEWAY_TAILSCALE_MODES: readonly GatewayTailscaleMode[] = ["off", "serve", "funnel"];
+
+function parseEnvBool(raw: string | undefined): boolean {
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
+function resolveHiveRuntimeConfig(opts: GatewayRunOpts, cfg: OpenClawConfig): HiveConfig | null {
+  const hiveConfigFromFile = cfg.gateway?.hive;
+  const hiveCliEnabled = Boolean(opts.hive);
+  const enabled =
+    hiveCliEnabled ||
+    parseEnvBool(process.env.OPENCLAW_HIVE_ENABLED) ||
+    parseEnvBool(process.env.HIVEMIND_ENABLED) ||
+    Boolean(hiveConfigFromFile?.enabled);
+  if (!enabled) {
+    return null;
+  }
+  const hiveModeOption = toOptionString(opts.hiveMode);
+  const modeRaw = (
+    hiveModeOption ??
+    process.env.OPENCLAW_HIVE_MODE ??
+    process.env.HIVEMIND_MODE ??
+    hiveConfigFromFile?.mode ??
+    "multi"
+  )
+    .trim()
+    .toLowerCase();
+  if (modeRaw !== "single" && modeRaw !== "multi") {
+    throw new Error('Invalid --hive-mode (use "single" or "multi")');
+  }
+  const mode = modeRaw === "single" ? "single" : "multi";
+  const workspacePath = process.env.OPENCLAW_WORKSPACE?.trim() || process.cwd();
+
+  const config = structuredClone(DEFAULT_HIVE_CONFIG);
+  config.enabled = true;
+  config.mode = mode;
+  config.memory.indexing.workspacePath = workspacePath;
+  config.memory.indexing.memoryPath = path.join(workspacePath, "memory");
+  config.stateMachine.checkpointPath = path.join(workspacePath, ".hivemind", "state.json");
+  return config;
+}
+
+async function startHiveRuntimeIfEnabled(
+  opts: GatewayRunOpts,
+  cfg: OpenClawConfig,
+  eventBus: EventBus,
+): Promise<HiveManager | null> {
+  const hiveConfig = resolveHiveRuntimeConfig(opts, cfg);
+  if (!hiveConfig || !hiveConfig.enabled || hiveConfig.mode !== "multi") {
+    return null;
+  }
+  const hiveManager = new HiveManager({
+    hiveConfig,
+    eventBus,
+  });
+  await hiveManager.initialize();
+  await hiveManager.ensureGatewayBridge();
+  gatewayLog.info("Hive runtime enabled (OPENCLAW_HIVE_ENABLED/HIVEMIND_ENABLED)");
+  return hiveManager;
+}
 
 function parseEnumOption<T extends string>(
   raw: string | undefined,
@@ -120,6 +192,11 @@ function resolveGatewayRunOptions(opts: GatewayRunOpts, command?: Command): Gate
     const inherited = inheritOptionFromParent(command, key);
     if (key === "wsLog") {
       // wsLog has a child default ("auto"), so prefer inherited parent CLI value when present.
+      resolved[key] = inherited ?? resolved[key];
+      continue;
+    }
+    if (key === "hiveMode") {
+      // hiveMode also has a child default ("multi"), so inherited explicit parent values must win.
       resolved[key] = inherited ?? resolved[key];
       continue;
     }
@@ -347,17 +424,28 @@ async function runGatewayCommand(opts: GatewayRunOpts) {
           ...(opts.tailscaleResetOnExit ? { resetOnExit: true } : {}),
         }
       : undefined;
+  const hiveEventBus = getGlobalEventBus();
 
   try {
     await runGatewayLoop({
       runtime: defaultRuntime,
       lockPort: port,
-      start: async () =>
-        await startGatewayServer(port, {
+      start: async () => {
+        const gatewayServer = await startGatewayServer(port, {
           bind,
           auth: authOverride,
           tailscale: tailscaleOverride,
-        }),
+        });
+        const hiveManager = await startHiveRuntimeIfEnabled(opts, cfg, hiveEventBus);
+        return {
+          close: async (closeOpts?: { reason?: string; restartExpectedMs?: number | null }) => {
+            if (hiveManager) {
+              await hiveManager.shutdown();
+            }
+            await gatewayServer.close(closeOpts);
+          },
+        };
+      },
     });
   } catch (err) {
     if (
@@ -431,6 +519,8 @@ export function addGatewayRunCommand(cmd: Command): Command {
     .option("--compact", 'Alias for "--ws-log compact"', false)
     .option("--raw-stream", "Log raw model stream events to jsonl", false)
     .option("--raw-stream-path <path>", "Raw stream jsonl path")
+    .option("--hive", "Enable Hive runtime in this gateway process", false)
+    .option("--hive-mode <mode>", 'Hive mode ("single"|"multi")')
     .action(async (opts, command) => {
       await runGatewayCommand(resolveGatewayRunOptions(opts, command));
     });

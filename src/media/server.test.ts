@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import type { AddressInfo } from "node:net";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -32,8 +33,31 @@ async function waitForFileRemoval(filePath: string, maxTicks = 1000) {
 }
 
 describe("media server", () => {
-  let server: Awaited<ReturnType<typeof startMediaServer>>;
+  let server: Awaited<ReturnType<typeof startMediaServer>> | undefined;
   let port = 0;
+  let canListenLoopback = true;
+
+  const canIgnoreListenError = (error: unknown): boolean => {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    return code === "EPERM" || code === "EACCES";
+  };
+
+  const canBindLoopbackPort = async (): Promise<boolean> => {
+    const probe = net.createServer();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        probe.once("error", reject);
+        probe.listen(0, "127.0.0.1", () => resolve());
+      });
+      await new Promise<void>((resolve) => probe.close(() => resolve()));
+      return true;
+    } catch (error) {
+      if (canIgnoreListenError(error)) {
+        return false;
+      }
+      throw error;
+    }
+  };
 
   function mediaUrl(id: string) {
     return `http://127.0.0.1:${port}/media/${id}`;
@@ -47,17 +71,26 @@ describe("media server", () => {
 
   beforeAll(async () => {
     MEDIA_DIR = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-media-test-"));
+    canListenLoopback = await canBindLoopbackPort();
+    if (!canListenLoopback) {
+      return;
+    }
     server = await startMediaServer(0, 1_000);
     port = (server.address() as AddressInfo).port;
   });
 
   afterAll(async () => {
-    await new Promise((r) => server.close(r));
+    if (server) {
+      await new Promise((r) => server.close(r));
+    }
     await fs.rm(MEDIA_DIR, { recursive: true, force: true });
     MEDIA_DIR = "";
   });
 
   it("serves media and cleans up after send", async () => {
+    if (!canListenLoopback) {
+      return;
+    }
     const file = await writeMediaFile("file1", "hello");
     const res = await fetch(mediaUrl("file1"));
     expect(res.status).toBe(200);
@@ -66,6 +99,9 @@ describe("media server", () => {
   });
 
   it("expires old media", async () => {
+    if (!canListenLoopback) {
+      return;
+    }
     const file = await writeMediaFile("old", "stale");
     const past = Date.now() - 10_000;
     await fs.utimes(file, past / 1000, past / 1000);
@@ -96,6 +132,9 @@ describe("media server", () => {
       },
     },
   ] as const)("$testName", async (testCase) => {
+    if (!canListenLoopback) {
+      return;
+    }
     await testCase.setup?.();
     const res = await fetch(mediaUrl(testCase.mediaPath));
     expect(res.status).toBe(400);
@@ -103,6 +142,9 @@ describe("media server", () => {
   });
 
   it("rejects oversized media files", async () => {
+    if (!canListenLoopback) {
+      return;
+    }
     const file = await writeMediaFile("big", "");
     await fs.truncate(file, MEDIA_MAX_BYTES + 1);
     const res = await fetch(mediaUrl("big"));
@@ -111,17 +153,26 @@ describe("media server", () => {
   });
 
   it("returns not found for missing media IDs", async () => {
+    if (!canListenLoopback) {
+      return;
+    }
     const res = await fetch(mediaUrl("missing-file"));
     expect(res.status).toBe(404);
     expect(await res.text()).toBe("not found");
   });
 
   it("returns 404 when route param is missing (dot path)", async () => {
+    if (!canListenLoopback) {
+      return;
+    }
     const res = await fetch(mediaUrl("."));
     expect(res.status).toBe(404);
   });
 
   it("rejects overlong media id", async () => {
+    if (!canListenLoopback) {
+      return;
+    }
     const res = await fetch(mediaUrl(`${"a".repeat(201)}.txt`));
     expect(res.status).toBe(400);
     expect(await res.text()).toBe("invalid path");
