@@ -10,6 +10,7 @@ import {
   normalizeSecretInput,
   normalizeOptionalSecretInput,
 } from "../utils/normalize-secret-input.js";
+import { upsertAuthProfile } from "../agents/auth-profiles.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
 import { ensureApiKeyFromEnvOrPrompt } from "./auth-choice.apply-helpers.js";
 import { applyPrimaryModel } from "./model-picker.js";
@@ -657,6 +658,24 @@ export function applyCustomApiConfig(params: ApplyCustomApiConfigParams): Custom
         },
       },
     };
+  }
+
+  // Bug #1 fix: Save API key to auth-profiles.json if it's a plain string key
+  // (not a secret reference or missing)
+  if (
+    typeof normalizedApiKey === "string" &&
+    normalizedApiKey.trim() !== "" &&
+    !isSecretRef(normalizedApiKey)
+  ) {
+    const profileId = `${providerId}:default`;
+    upsertAuthProfile({
+      profileId,
+      credential: {
+        type: "api_key",
+        provider: providerId,
+        key: normalizedApiKey.trim(),
+      },
+    });
   }
 
   return {

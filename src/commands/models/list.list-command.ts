@@ -5,7 +5,7 @@ import { parseModelRef } from "../../agents/model-selection.js";
 import type { RuntimeEnv } from "../../runtime.js";
 import { resolveConfiguredEntries } from "./list.configured.js";
 import { formatErrorWithStack } from "./list.errors.js";
-import { loadModelRegistry, toModelRow } from "./list.registry.js";
+import { loadModelRegistry, hasAuthForProvider, toModelRow } from "./list.registry.js";
 import { printModelTable } from "./list.table.js";
 import type { ModelRow } from "./list.types.js";
 import { loadModelsConfig } from "./load-config.js";
@@ -97,6 +97,12 @@ export async function modelsListCommand(
       if (providerFilter && entry.ref.provider.toLowerCase() !== providerFilter) {
         continue;
       }
+
+      // Bug #2 fix: Skip models without authentication credentials
+      if (!hasAuthForProvider(entry.ref.provider, cfg, authStore)) {
+        continue;
+      }
+
       let model = modelByKey.get(entry.key);
       if (!model && modelRegistry) {
         const forwardCompat = resolveForwardCompatModel(

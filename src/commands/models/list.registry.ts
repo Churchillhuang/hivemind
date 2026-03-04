@@ -42,6 +42,8 @@ const hasAuthForProvider = (
   return false;
 };
 
+export { hasAuthForProvider };
+
 function createAvailabilityUnavailableError(message: string): Error {
   const err = new Error(message);
   (err as { code?: string }).code = MODEL_AVAILABILITY_UNAVAILABLE_CODE;
