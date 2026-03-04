@@ -7,14 +7,15 @@
  * - 探索 vs 利用机制
  */
 
-import { CoordinationAgent, type AgentCapabilities } from './CoordinationAgent.js';
-import type { Event } from '../events/Event.js';
+import type { Event } from "../events/Event.js";
+import type { EventBus } from "../events/EventBus.js";
+import { CoordinationAgent, type AgentCapabilities } from "./CoordinationAgent.js";
 import {
   SkillProfile,
   TaskSkillRequirement,
   BidWithSkills,
   SkillfulAgent,
-} from './SkillProfile.js';
+} from "./SkillProfile.js";
 
 export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent {
   /**
@@ -36,11 +37,11 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
     config: {
       id: string;
       role: string;
-      type: 'system' | 'functional';
+      type: "system" | "functional";
       description?: string;
     },
     capabilities: AgentCapabilities,
-    eventBus?: any,
+    eventBus?: EventBus,
     explorationProbability?: number,
   ) {
     super(config, capabilities, eventBus);
@@ -55,10 +56,10 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
         maxRetries: 3,
       },
       decay: {
-        interval: 86400,     // 24 小时
-        rate: 0.1,           // 每次衰减 10%
-        minScore: 0.3,       // 最低保留 0.3
-        protectionPeriod: 2592000,   // 30 天
+        interval: 86400, // 24 小时
+        rate: 0.1, // 每次衰减 10%
+        minScore: 0.3, // 最低保留 0.3
+        protectionPeriod: 2592000, // 30 天
       },
     };
   }
@@ -74,7 +75,7 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
    * 基于技能评分的报价
    * 重写父类的 placeBid 方法
    */
-  protected placeBid(task: any): any | null {
+  protected placeBid(task: unknown): BidWithSkills | null {
     // 1. 解析任务技能需求
     const requirements: TaskSkillRequirement = this.parseTaskRequirements(task);
 
@@ -91,8 +92,8 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
 
     // 5. 如果探索，则不拒绝（即使技能完全不匹配）
     // 但需要检查是否有主动加载的技能
-    if (isExploration === false && skillMatchScore === 0) {
-      return null;  // 既不探索，又不匹配 → 不投标
+    if (!isExploration && skillMatchScore === 0) {
+      return null; // 既不探索，又不匹配 → 不投标
     }
 
     // 6. 估算耗时
@@ -105,7 +106,7 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
 
     // 7. 计算基础评分（负载 + 耗时 + 随机性）
     const load = this.getCurrentLoad();
-    const timeFactor = estimatedTime / 10000;  // 归一化
+    const timeFactor = estimatedTime / 10000; // 归一化
     const randomFactor = Math.random() * 0.2;
 
     let baseScore = load * 0.5 + timeFactor * 0.3 + randomFactor;
@@ -137,42 +138,46 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
    * 解析任务技能需求
    * 从任务描述中推断需要的技能
    */
-  private parseTaskRequirements(task: any): TaskSkillRequirement {
+  private parseTaskRequirements(task: unknown): TaskSkillRequirement {
+    const taskData = (task ?? {}) as {
+      taskType?: string;
+      requiredSkills?: Record<string, number>;
+    };
     const requiredSkills = new Map<string, number>();
 
     // 方式 1: 任务明确指定技能需求
-    if (task.requiredSkills) {
-      for (const [skill, minScore] of Object.entries(task.requiredSkills)) {
-        requiredSkills.set(skill, minScore as number);
+    if (taskData.requiredSkills) {
+      for (const [skill, minScore] of Object.entries(taskData.requiredSkills)) {
+        requiredSkills.set(skill, minScore);
       }
     }
 
     // 方式 2: 根据任务类型推断（简单的启发式规则）
     else {
-      const taskType = task.taskType;
+      const taskType = taskData.taskType;
 
-      if (taskType === 'philosophy_discussion') {
-        requiredSkills.set('philosophy_analysis', 0.6);
-        requiredSkills.set('chinese_writing', 0.8);
-      } else if (taskType === 'file_analysis') {
-        requiredSkills.set('code_analysis', 0.7);
-        requiredSkills.set('language_detection', 0.6);
-      } else if (taskType === 'data_processing') {
-        requiredSkills.set('python', 0.7);
-        requiredSkills.set('data_analysis', 0.7);
-      } else if (taskType === 'writing') {
-        requiredSkills.set('chinese_writing', 0.7);
-        requiredSkills.set('writing_structure', 0.6);
-      } else if (taskType === 'translation') {
-        requiredSkills.set('translation', 0.7);
-        requiredSkills.set('bilingual', 0.6);
+      if (taskType === "philosophy_discussion") {
+        requiredSkills.set("philosophy_analysis", 0.6);
+        requiredSkills.set("chinese_writing", 0.8);
+      } else if (taskType === "file_analysis") {
+        requiredSkills.set("code_analysis", 0.7);
+        requiredSkills.set("language_detection", 0.6);
+      } else if (taskType === "data_processing") {
+        requiredSkills.set("python", 0.7);
+        requiredSkills.set("data_analysis", 0.7);
+      } else if (taskType === "writing") {
+        requiredSkills.set("chinese_writing", 0.7);
+        requiredSkills.set("writing_structure", 0.6);
+      } else if (taskType === "translation") {
+        requiredSkills.set("translation", 0.7);
+        requiredSkills.set("bilingual", 0.6);
       }
     }
 
     return {
       requiredSkills,
       optionalSkills: new Map(),
-      matchMode: 'all',
+      matchMode: "all",
     };
   }
 
@@ -201,7 +206,8 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
 
       // 查找任务详情（需要从 taskQueue 获取，这里简化）
       // 假设我们从事件中也能获取到任务信息
-      const task = (event as any).task || {};
+      const taskPayload = event.payload as { task?: unknown };
+      const task = taskPayload.task ?? {};
       const requirements = this.parseTaskRequirements(task);
 
       // 记录任务开始
@@ -212,7 +218,7 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
       };
 
       console.log(`[${this.id}] Task assigned: ${taskId}`);
-      console.log(`  Required skills: ${this.currentTask.skillNames.join(', ')}`);
+      console.log(`  Required skills: ${this.currentTask.skillNames.join(", ")}`);
 
       // 调用父类方法处理
       await super.handleTaskAssignment(event);
@@ -229,21 +235,15 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
     // 记录任务完成
     const task = this.currentTask;
     if (task) {
-      const duration = (Date.now() - task.startTime) / 1000;  // 秒
+      const duration = (Date.now() - task.startTime) / 1000; // 秒
 
       // 更新技能评分
-      task.skillNames.forEach(skillName => {
+      task.skillNames.forEach((skillName) => {
         // 简化：假设所有任务都成功
         // 实际应用中应该从任务结果判断
         const success = true;
 
-        this.updateSkill(
-          skillName,
-          success,
-          duration,
-          'domain',
-          skillName,
-        );
+        this.updateSkill(skillName, success, duration, "domain", skillName);
       });
 
       // 清除当前任务
@@ -272,14 +272,22 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
     console.log(`  Total: ${stats.totalSkills}`);
     console.log(`  Average: ${stats.averageScore.toFixed(3)}`);
     if (stats.topSkills.length > 0) {
-      console.log(`  Top: ${stats.topSkills.map(s => `${s.name} (${s.score.toFixed(3)})`).join(', ')}`);
+      console.log(
+        `  Top: ${stats.topSkills.map((s) => `${s.name} (${s.score.toFixed(3)})`).join(", ")}`,
+      );
     }
   }
 
   /**
    * 实现 SkillfulAgent 接口的方法
    */
-  updateSkill(skillName: string, success: boolean, duration: number, type: any, tags: any): void {
+  updateSkill(
+    skillName: string,
+    success: boolean,
+    duration: number,
+    type: "domain" | "tool" | "method",
+    tags: string,
+  ): void {
     const record = this.skillProfile.dynamicSkills.get(skillName);
 
     const newRecord = record || {
@@ -317,7 +325,7 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
     return record?.score || 0;
   }
 
-  meetsSkillRequirements(requirements: any): boolean {
+  meetsSkillRequirements(requirements: TaskSkillRequirement): boolean {
     const { requiredSkills, matchMode } = requirements;
 
     if (requiredSkills.size === 0) {
@@ -325,7 +333,7 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
     }
 
     switch (matchMode) {
-      case 'all':
+      case "all":
         for (const [skill, minScore] of requiredSkills.entries()) {
           const myScore = this.getSkillScore(skill);
           if (myScore < minScore) {
@@ -334,7 +342,7 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
         }
         return true;
 
-      case 'any':
+      case "any":
         for (const [skill, minScore] of requiredSkills.entries()) {
           const myScore = this.getSkillScore(skill);
           if (myScore >= minScore) {
@@ -343,7 +351,7 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
         }
         return false;
 
-      case 'majority':
+      case "majority":
         let metCount = 0;
         for (const [skill, minScore] of requiredSkills.entries()) {
           const myScore = this.getSkillScore(skill);
@@ -358,7 +366,7 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
     }
   }
 
-  calculateSkillMatchScore(requirements: any): number {
+  calculateSkillMatchScore(requirements: TaskSkillRequirement): number {
     const { requiredSkills, optionalSkills } = requirements;
 
     if (requiredSkills.size === 0) {
@@ -388,7 +396,7 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
     const now = Date.now();
     const decayConfig = this.skillProfile.decay;
 
-    for (const [skillName, record] of this.skillProfile.dynamicSkills.entries()) {
+    for (const [_skillName, record] of this.skillProfile.dynamicSkills.entries()) {
       const age = now - record.lastUsed;
       if (age < decayConfig.protectionPeriod) {
         continue;
@@ -416,10 +424,15 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
       extractedAt: Date.now(),
     });
 
-    console.log(`[${this.id}] Active skill loaded: ${skillName} (confidence: ${(confidence * 100).toFixed(0)}%)`);
+    console.log(
+      `[${this.id}] Active skill loaded: ${skillName} (confidence: ${(confidence * 100).toFixed(0)}%)`,
+    );
   }
 
-  shouldExplore(taskSkillRequirements: any, currentSkillMatchScore: number): boolean {
+  shouldExplore(
+    taskSkillRequirements: TaskSkillRequirement,
+    currentSkillMatchScore: number,
+  ): boolean {
     if (Math.random() < this.skillProfile.exploration.probability) {
       return true;
     }
@@ -454,12 +467,12 @@ export class SkillDrivenAgent extends CoordinationAgent implements SkillfulAgent
     const avgScore = totalScore / skills.length;
 
     const topSkills = skills
-      .map(skill => ({
+      .map((skill) => ({
         name: skill.type,
         score: skill.score,
         count: skill.count,
       }))
-      .sort((a, b) => b.score - a.score)
+      .toSorted((a, b) => b.score - a.score)
       .slice(0, 5);
 
     return {

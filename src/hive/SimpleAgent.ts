@@ -15,9 +15,10 @@
  *   - 默认 → 0
  */
 
-import { CoordinationAgent, type AgentCapabilities } from './CoordinationAgent.js';
-import type { Event } from '../events/Event.js';
-import type { SimpleTaskAnnouncement, SimpleBid } from './SimpleNegotiationRouter.js';
+import type { Event } from "../events/Event.js";
+import type { EventBus } from "../events/EventBus.js";
+import { CoordinationAgent, type AgentCapabilities } from "./CoordinationAgent.js";
+import type { SimpleTaskAnnouncement } from "./SimpleNegotiationRouter.js";
 
 export interface SimpleSkillRecord {
   successCount: number;
@@ -55,34 +56,34 @@ export class SimpleAgent extends CoordinationAgent {
      * 成功率高时的探索奖励
      * 如果某个技能的成功率 > highSuccessThreshold，愿意程度增加
      */
-    highSuccessThreshold: number;  // 默认 0.8
-    highSuccessBonus: number;      // 默认 0.2
+    highSuccessThreshold: number; // 默认 0.8
+    highSuccessBonus: number; // 默认 0.2
 
     /**
      * 连续失败时的探索奖励
      * 如果某个技能连续失败 > maxConsecutiveFailures，愿意程度大幅增加
      * （意味着："我想换种方式"）
      */
-    maxConsecutiveFailures: number;  // 默认 3
+    maxConsecutiveFailures: number; // 默认 3
     consecutiveFailureBonus: number; // 默认 0.5
 
     /**
      * 基础随机性
      * 允许一些"随机冲动"
      */
-    randomness: number;  // 默认 0.1 (10%)
+    randomness: number; // 默认 0.1 (10%)
   };
 
   constructor(
     config: {
       id: string;
       role: string;
-      type: 'system' | 'functional';
+      type: "system" | "functional";
       description?: string;
     },
     capabilities: AgentCapabilities,
-    eventBus?: any,
-    customMotivation?: Partial<typeof SimpleAgent.prototype['motivation']>,
+    eventBus?: EventBus,
+    customMotivation?: Partial<(typeof SimpleAgent.prototype)["motivation"]>,
   ) {
     super(config, capabilities, eventBus);
 
@@ -100,7 +101,7 @@ export class SimpleAgent extends CoordinationAgent {
     };
 
     // 订阅任务公告
-    this.subscribeTo('SIMPLE_TASK_ANNOUNCEMENT');
+    this.subscribeTo("SIMPLE_TASK_ANNOUNCEMENT");
   }
 
   /**
@@ -112,7 +113,7 @@ export class SimpleAgent extends CoordinationAgent {
     const skill = this.skills.get(skillName);
 
     if (!skill || skill.count === 0) {
-      return 0.5;  // 没有经验，不确定
+      return 0.5; // 没有经验，不确定
     }
 
     return skill.successCount / skill.count;
@@ -150,7 +151,9 @@ export class SimpleAgent extends CoordinationAgent {
     const consecutiveSuccesses = this.consecutiveSuccesses.get(taskSkill) || 0;
     if (successRate > this.motivation.highSuccessThreshold && consecutiveSuccesses > 3) {
       willingness += this.motivation.highSuccessBonus;
-      console.log(`[${this.id}] High success rate (${successRate.toFixed(2)}), seeking new challenges`);
+      console.log(
+        `[${this.id}] High success rate (${successRate.toFixed(2)}), seeking new challenges`,
+      );
     }
 
     // 6. 完全没有经验的任务
@@ -163,7 +166,7 @@ export class SimpleAgent extends CoordinationAgent {
 
     // 7. 添加随机性（"随机冲动"）
     if (Math.random() < this.motivation.randomness) {
-      willingness += 0.2;  // 随机增加意愿
+      willingness += 0.2; // 随机增加意愿
       console.log(`[${this.id}] Random impulse +0.2`);
     }
 
@@ -187,7 +190,9 @@ export class SimpleAgent extends CoordinationAgent {
     if (willingness > 0) {
       this.publishBid(task.taskId, willingness);
     } else {
-      console.log(`[${this.id}] Not willing to bid for ${task.taskId} (willingness: ${willingness.toFixed(3)})`);
+      console.log(
+        `[${this.id}] Not willing to bid for ${task.taskId} (willingness: ${willingness.toFixed(3)})`,
+      );
     }
   }
 
@@ -195,14 +200,8 @@ export class SimpleAgent extends CoordinationAgent {
    * 发布报价
    */
   private publishBid(taskId: string, willingness: number): void {
-    const bid: SimpleBid = {
-      agentId: this.id,
-      willing: willingness,
-      timestamp: Date.now(),
-    };
-
-    this.eventBus?.publish({
-      type: 'SIMPLE_BID',
+    void this.eventBus?.publish({
+      type: "SIMPLE_BID",
       sourceAgent: this.id,
       payload: {
         taskId,
@@ -236,23 +235,24 @@ export class SimpleAgent extends CoordinationAgent {
 
       // 更新连续成功
       this.consecutiveSuccesses.set(skillName, (this.consecutiveSuccesses.get(skillName) || 0) + 1);
-      this.consecutiveFailures.set(skillName, 0);  // 重置连续失败
-
+      this.consecutiveFailures.set(skillName, 0); // 重置连续失败
     } else {
       skill.failCount += 1;
 
       // 更新连续失败
       this.consecutiveFailures.set(skillName, (this.consecutiveFailures.get(skillName) || 0) + 1);
-      this.consecutiveSuccesses.set(skillName, 0);  // 重置连续成功
+      this.consecutiveSuccesses.set(skillName, 0); // 重置连续成功
     }
 
     this.skills.set(skillName, skill);
 
-    console.log(`[${this.id}] Skill updated for ${taskType}:`)
-    console.log(`  Success: ${skill.successCount}, Fail: ${skill.failCount}, Total: ${skill.count}`)
-    console.log(`  Success Rate: ${(skill.successCount / skill.count).toFixed(3)}`)
-    console.log(`  Consecutive Successes: ${this.consecutiveSuccesses.get(skillName) || 0}`)
-    console.log(`  Consecutive Failures: ${this.consecutiveFailures.get(skillName) || 0}`)
+    console.log(`[${this.id}] Skill updated for ${taskType}:`);
+    console.log(
+      `  Success: ${skill.successCount}, Fail: ${skill.failCount}, Total: ${skill.count}`,
+    );
+    console.log(`  Success Rate: ${(skill.successCount / skill.count).toFixed(3)}`);
+    console.log(`  Consecutive Successes: ${this.consecutiveSuccesses.get(skillName) || 0}`);
+    console.log(`  Consecutive Failures: ${this.consecutiveFailures.get(skillName) || 0}`);
   }
 
   /**
@@ -260,11 +260,11 @@ export class SimpleAgent extends CoordinationAgent {
    */
   async handle(event: Event): Promise<void> {
     switch (event.type) {
-      case 'SIMPLE_TASK_ANNOUNCEMENT':
+      case "SIMPLE_TASK_ANNOUNCEMENT":
         await this.handleSimpleTaskAnnouncement(event);
         break;
 
-      case 'TASK_ASSIGNED':
+      case "TASK_ASSIGNED":
         await this.handleTaskAssignment(event);
         break;
 

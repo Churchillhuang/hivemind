@@ -4,14 +4,15 @@
  * 连续性分析：主体性测量、意图建模、一致性跟踪、自我意识检测
  */
 
-import { EmergenceMonitor } from './EmergenceMonitor.js';
+import { EmergenceMonitor } from "./EmergenceMonitor.js";
+import type { EventTrace } from "./EmergenceMonitor.js";
 
 /**
  * 主体性分数
  */
 export interface AgencyScore {
   agentId: string;
-  score: number;  // 0-1
+  score: number; // 0-1
   factors: {
     factor: string;
     weight: number;
@@ -30,9 +31,9 @@ export interface IntentModel {
     intent: string;
     timestamp: number;
     duration: number;
-    completion: number;  // 0-1
+    completion: number; // 0-1
   }>;
-  intentStrength: number;  // 0-1
+  intentStrength: number; // 0-1
 }
 
 /**
@@ -40,7 +41,7 @@ export interface IntentModel {
  */
 export interface ConsistencyTracking {
   agentId: string;
-  consistencyScore: number;  // 0-1
+  consistencyScore: number; // 0-1
   behaviorPatterns: string[];
   deviations: Array<{
     timestamp: number;
@@ -48,7 +49,7 @@ export interface ConsistencyTracking {
     actual: string;
     anomaly: boolean;
   }>;
-  coherence: number;  // 0-1
+  coherence: number; // 0-1
 }
 
 /**
@@ -56,11 +57,11 @@ export interface ConsistencyTracking {
  */
 export interface SelfAwarenessIndicators {
   agentId: string;
-  selfReference: number;  // 0-1 - 自我引用频率
-  reflectiveBehavior: number;  // 0-1 - 反思行为
-  selfPreservation: number;  // 0-1 - 自我保存倾向
-  selfImprovement: number;  // 0-1 - 自我改进倾向
-  overallScore: number;  // 0-1
+  selfReference: number; // 0-1 - 自我引用频率
+  reflectiveBehavior: number; // 0-1 - 反思行为
+  selfPreservation: number; // 0-1 - 自我保存倾向
+  selfImprovement: number; // 0-1 - 自我改进倾向
+  overallScore: number; // 0-1
 }
 
 /**
@@ -93,23 +94,27 @@ export class ContinuityAnalyzer {
       const evidence: string[] = [];
 
       // 因素 1: 自发交互频率
-      const agentEdges = graphs.edges.filter(e => e.from === currentAgentId || e.to === currentAgentId);
-      const avgWeight = agentEdges.length > 0
-        ? agentEdges.reduce((sum, e) => sum + e.weight, 0) / agentEdges.length
-        : 0;
+      const agentEdges = graphs.edges.filter(
+        (e) => e.from === currentAgentId || e.to === currentAgentId,
+      );
+      const avgWeight =
+        agentEdges.length > 0
+          ? agentEdges.reduce((sum, e) => sum + e.weight, 0) / agentEdges.length
+          : 0;
       const spontaneity = Math.min(1, avgWeight / 10);
-      factors.push({ factor: 'spontaneity', weight: 0.25, value: spontaneity });
+      factors.push({ factor: "spontaneity", weight: 0.25, value: spontaneity });
       if (spontaneity > 0.5) {
         evidence.push(`Frequent spontaneous interactions (avg: ${avgWeight.toFixed(1)})`);
       }
 
       // 因素 2: 主动 vs 被动
-      const outgoingEdges = agentEdges.filter(e => e.from === currentAgentId);
-      const incomingEdges = agentEdges.filter(e => e.to === currentAgentId);
-      const initiative = outgoingEdges.length > 0
-        ? outgoingEdges.length / (outgoingEdges.length + incomingEdges.length)
-        : 0.5;
-      factors.push({ factor: 'initiative', weight: 0.2, value: initiative });
+      const outgoingEdges = agentEdges.filter((e) => e.from === currentAgentId);
+      const incomingEdges = agentEdges.filter((e) => e.to === currentAgentId);
+      const initiative =
+        outgoingEdges.length > 0
+          ? outgoingEdges.length / (outgoingEdges.length + incomingEdges.length)
+          : 0.5;
+      factors.push({ factor: "initiative", weight: 0.2, value: initiative });
       if (initiative > 0.6) {
         evidence.push(`High initiative (${(initiative * 100).toFixed(0)}% outgoing)`);
       }
@@ -126,7 +131,7 @@ export class ContinuityAnalyzer {
         }
         consistency = 1 - Math.min(1, stateChanges / snapshots.length);
       }
-      factors.push({ factor: 'consistency', weight: 0.2, value: consistency });
+      factors.push({ factor: "consistency", weight: 0.2, value: consistency });
       if (consistency > 0.7) {
         evidence.push(`Consistent behavior pattern`);
       }
@@ -134,14 +139,14 @@ export class ContinuityAnalyzer {
       // 因素 4: 反馈循环
       const feedbackLoops = this.detectFeedbackLoops(currentAgentId);
       const loopScore = Math.min(1, feedbackLoops / 3);
-      factors.push({ factor: 'feedback_loops', weight: 0.15, value: loopScore });
+      factors.push({ factor: "feedback_loops", weight: 0.15, value: loopScore });
       if (feedbackLoops > 0) {
         evidence.push(`${feedbackLoops} feedback loops detected`);
       }
 
       // 因素 5: 目标驱动行为
       const goalDirectedness = this.analyzeGoalDirectedness(currentAgentId);
-      factors.push({ factor: 'goal_directedness', weight: 0.2, value: goalDirectedness });
+      factors.push({ factor: "goal_directedness", weight: 0.2, value: goalDirectedness });
       if (goalDirectedness > 0.5) {
         evidence.push(`Goal-directed behavior pattern`);
       }
@@ -158,7 +163,7 @@ export class ContinuityAnalyzer {
     }
 
     // 按分数排序
-    return scores.sort((a, b) => b.score - a.score);
+    return scores.toSorted((a, b) => b.score - a.score);
   }
 
   /**
@@ -166,10 +171,11 @@ export class ContinuityAnalyzer {
    */
   private detectFeedbackLoops(agentId: string): number {
     const traces = this.emergenceMonitor.getEventTraces(agentId);
-    const feedbackLoops = 0;
 
     // 简化：检查自我引用事件
-    const selfRefEvents = traces.filter(t => t.sourceAgentId === agentId && t.targetAgentId === agentId);
+    const selfRefEvents = traces.filter(
+      (t) => t.sourceAgentId === agentId && t.targetAgentId === agentId,
+    );
     // 更复杂的检测需要分析事件序列
 
     return selfRefEvents.length;
@@ -212,11 +218,13 @@ export class ContinuityAnalyzer {
     };
 
     // 更新当前意图
-    model.currentIntents = intents.map(i => i.intent);
+    model.currentIntents = intents.map((i) => i.intent);
 
     // 更新意图历史
     for (const intent of intents) {
-      const existing = model.intentHistory.find(i => i.intent === intent.intent && i.timestamp + intent.duration > Date.now());
+      const existing = model.intentHistory.find(
+        (i) => i.intent === intent.intent && i.timestamp + intent.duration > Date.now(),
+      );
       if (existing) {
         existing.completion = Math.min(1, existing.completion + 0.1);
       } else {
@@ -230,10 +238,11 @@ export class ContinuityAnalyzer {
     }
 
     // 计算意图强度
-    const activeIntents = model.intentHistory.filter(i => i.timestamp + i.duration > Date.now());
-    model.intentStrength = activeIntents.length > 0
-      ? activeIntents.reduce((sum, i) => sum + i.completion, 0) / activeIntents.length
-      : 0;
+    const activeIntents = model.intentHistory.filter((i) => i.timestamp + i.duration > Date.now());
+    model.intentStrength =
+      activeIntents.length > 0
+        ? activeIntents.reduce((sum, i) => sum + i.completion, 0) / activeIntents.length
+        : 0;
 
     this.intentModels.set(agentId, model);
 
@@ -243,18 +252,18 @@ export class ContinuityAnalyzer {
   /**
    * 提取意图（简化）
    */
-  private extractIntents(traces: any[]): Array<{
+  private extractIntents(traces: EventTrace[]): Array<{
     intent: string;
     duration: number;
   }> {
     const intents: Array<{ intent: string; duration: number }> = [];
 
     // 基于事件类型推断意图
-    const taskEvents = traces.filter(t => t.type.includes('task'));
+    const taskEvents = traces.filter((t) => t.type.includes("task"));
     for (const event of taskEvents) {
       const intent = event.payload as { intent?: string; action?: string };
       if (intent.intent) {
-        intents.push({ intent: intent.intent, duration: 60000 });  // 默认 1 分钟
+        intents.push({ intent: intent.intent, duration: 60000 }); // 默认 1 分钟
       } else if (intent.action) {
         intents.push({ intent: intent.action, duration: 60000 });
       }
@@ -266,7 +275,7 @@ export class ContinuityAnalyzer {
       if (snapshot.properties.intent) {
         intents.push({
           intent: snapshot.properties.intent as string,
-          duration: 120000,  // 默认 2 分钟
+          duration: 120000, // 默认 2 分钟
         });
       }
     }
@@ -310,9 +319,14 @@ export class ContinuityAnalyzer {
     tracking.behaviorPatterns = patterns;
 
     // 计算一致性分数
-    const consistency = patterns.length > 0
-      ? Math.min(1, patterns.reduce((sum, p) => sum + parseInt(p.match(/x(\d+)/)?.[1] || '1'), 0) / snapshots.length)
-      : 0.5;
+    const consistency =
+      patterns.length > 0
+        ? Math.min(
+            1,
+            patterns.reduce((sum, p) => sum + parseInt(p.match(/x(\d+)/)?.[1] || "1"), 0) /
+              snapshots.length,
+          )
+        : 0.5;
     tracking.consistencyScore = consistency;
 
     // 检测偏差
@@ -333,9 +347,10 @@ export class ContinuityAnalyzer {
     }
 
     // 计算连贯性
-    const coherence = tracking.deviations.length === 0
-      ? consistency
-      : Math.max(0, consistency - tracking.deviations.length * 0.1);
+    const coherence =
+      tracking.deviations.length === 0
+        ? consistency
+        : Math.max(0, consistency - tracking.deviations.length * 0.1);
     tracking.coherence = coherence;
 
     this.consistencyTrackings.set(agentId, tracking);
@@ -364,8 +379,7 @@ export class ContinuityAnalyzer {
 
     const expectedPatterns = new Map<string, string>();
     for (const [fromState, stateMap] of transitions.entries()) {
-      const mostFrequent = Array.from(stateMap.entries())
-        .sort((a, b) => b[1] - a[1])[0];
+      const mostFrequent = Array.from(stateMap.entries()).toSorted((a, b) => b[1] - a[1])[0];
       if (mostFrequent) {
         expectedPatterns.set(fromState, mostFrequent[0]);
       }
@@ -380,26 +394,29 @@ export class ContinuityAnalyzer {
   detectSelfAwareness(agentId: string): SelfAwarenessIndicators {
     const agency = this.measureAgency(agentId)[0];
     const intentModel = this.intentModels.get(agentId);
-    const tracking = this.consistencyTrackings.get(agentId);
 
     // 自我引用频率
-    const selfReferenceTraces = this.emergenceMonitor.getEventTraces(agentId).filter(
-      t => t.sourceAgentId === agentId && t.targetAgentId === agentId,
-    );
+    const selfReferenceTraces = this.emergenceMonitor
+      .getEventTraces(agentId)
+      .filter((t) => t.sourceAgentId === agentId && t.targetAgentId === agentId);
     const selfReference = Math.min(1, selfReferenceTraces.length / 20);
 
     // 反思行为
-    const reflectiveBehavior = agency?.factors.find(f => f.factor === 'feedback_loops')?.value || 0;
+    const reflectiveBehavior =
+      agency?.factors.find((f) => f.factor === "feedback_loops")?.value || 0;
 
     // 自我保存倾向
-    const selfPreservation = agency?.evidence.some(e => e.includes('consistency')) ? 0.7 : 0.3;
+    const selfPreservation = agency?.evidence.some((e) => e.includes("consistency")) ? 0.7 : 0.3;
 
     // 自我改进倾向
     const selfImprovement = intentModel ? intentModel.intentStrength * 0.7 : 0.2;
 
     // 计算总体分数
-    const overallScore = (selfReference * 0.25 + reflectiveBehavior * 0.25
-      + selfPreservation * 0.25 + selfImprovement * 0.25);
+    const overallScore =
+      selfReference * 0.25 +
+      reflectiveBehavior * 0.25 +
+      selfPreservation * 0.25 +
+      selfImprovement * 0.25;
 
     return {
       agentId,
@@ -416,7 +433,7 @@ export class ContinuityAnalyzer {
    */
   getAllSelfAwarenessIndicators(): SelfAwarenessIndicators[] {
     const agents = this.emergenceMonitor.getActiveAgents();
-    return agents.map(agentId => this.detectSelfAwareness(agentId));
+    return agents.map((agentId) => this.detectSelfAwareness(agentId));
   }
 
   /**
@@ -425,6 +442,6 @@ export class ContinuityAnalyzer {
   reset(): void {
     this.intentModels.clear();
     this.consistencyTrackings.clear();
-    console.log('[Continuity] Continuity analyzer reset');
+    console.log("[Continuity] Continuity analyzer reset");
   }
 }

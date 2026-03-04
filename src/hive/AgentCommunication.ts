@@ -4,21 +4,20 @@
  * Agent 间通信 - 直接消息、请求/响应、广播、死锁预防
  */
 
-import { getGlobalEventBus } from '../events/EventBus.js';
-import { randomUUID } from 'node:crypto';
-import type { Event } from '../events/Event.js';
-import { EventType } from '../events/Event.js';
-import type { HiveConfig } from './HiveConfig.js';
+import { randomUUID } from "node:crypto";
+import type { Event } from "../events/Event.js";
+import { getGlobalEventBus } from "../events/EventBus.js";
+import type { HiveConfig } from "./HiveConfig.js";
 
 /**
  * 消息类型
  */
-export type MessageType = 'direct' | 'request' | 'response' | 'broadcast';
+export type MessageType = "direct" | "request" | "response" | "broadcast";
 
 /**
  * 消息优先级
  */
-export type MessagePriority = 'urgent' | 'normal' | 'low';
+export type MessagePriority = "urgent" | "normal" | "low";
 
 /**
  * Agent Message - Agent 间消息
@@ -28,14 +27,14 @@ export interface AgentMessage {
   type: MessageType;
   priority: MessagePriority;
   from: string;
-  to: string | string[];  // 单或多接收者
+  to: string | string[]; // 单或多接收者
   content: string;
   data?: Record<string, unknown>;
   timestamp: number;
-  correlationId?: string;  // 用于 request/response 关联
-  replyTo?: string;  // 原始消息 ID
-  channelId?: string;  // 用于广播
-  ttl?: number;  // TTL (毫秒)
+  correlationId?: string; // 用于 request/response 关联
+  replyTo?: string; // 原始消息 ID
+  channelId?: string; // 用于广播
+  ttl?: number; // TTL (毫秒)
   headers?: Record<string, string>;
 }
 
@@ -55,7 +54,7 @@ export interface BroadcastChannel {
   id: string;
   name: string;
   subscribers: Set<string>;
-  filters?: Record<string, unknown>;  // 消息过滤条件
+  filters?: Record<string, unknown>; // 消息过滤条件
 }
 
 /**
@@ -90,20 +89,23 @@ export class AgentCommunication {
 
   // 消息队列
   private messageQueue: Map<string, AgentMessage> = new Map();
-  private pendingRequests: Map<string, {
-    message: AgentMessage;
-    resolve: (response: AgentMessage) => void;
-    reject: (error: Error) => void;
-    timer: NodeJS.Timeout;
-    retryCount: number;
-  }> = new Map();
+  private pendingRequests: Map<
+    string,
+    {
+      message: AgentMessage;
+      resolve: (response: AgentMessage) => void;
+      reject: (error: Error) => void;
+      timer: NodeJS.Timeout;
+      retryCount: number;
+    }
+  > = new Map();
 
   // 广播频道
   private broadcastChannels: Map<string, BroadcastChannel> = new Map();
 
   // 死锁预防
-  private waitingFor: Map<string, string> = new Map();  // agent -> waiting for
-  private requestTimeout: Map<string, number> = new Map();  // request -> timestamp
+  private waitingFor: Map<string, string> = new Map(); // agent -> waiting for
+  private requestTimeout: Map<string, number> = new Map(); // request -> timestamp
 
   // 统计
   private stats: CommunicationStats = {
@@ -119,16 +121,16 @@ export class AgentCommunication {
 
   // 默认配置
   private defaultRequestConfig: RequestConfig = {
-    timeout: 10000,  // 10 秒
+    timeout: 10000, // 10 秒
     retryCount: 3,
-    retryDelay: 1000,  // 1 秒
+    retryDelay: 1000, // 1 秒
   };
 
   constructor(hiveConfig: HiveConfig) {
     this.hiveConfig = hiveConfig;
 
     // 订阅消息事件
-    this.eventBus.subscribe('AGENT_MESSAGE_RECEIVED', this.handleMessageReceived.bind(this));
+    this.eventBus.subscribe("AGENT_MESSAGE_RECEIVED", this.handleMessageReceived.bind(this));
   }
 
   /**
@@ -142,8 +144,8 @@ export class AgentCommunication {
   ): Promise<void> {
     const message: AgentMessage = {
       id: this.generateMessageId(),
-      type: 'direct',
-      priority: 'normal',
+      type: "direct",
+      priority: "normal",
       from,
       to,
       content,
@@ -174,8 +176,8 @@ export class AgentCommunication {
 
     const message: AgentMessage = {
       id: messageId,
-      type: 'request',
-      priority: 'normal',
+      type: "request",
+      priority: "normal",
       from,
       to,
       content,
@@ -208,7 +210,7 @@ export class AgentCommunication {
       });
 
       // 发送请求
-      this.sendMessage(message);
+      void this.sendMessage(message);
 
       this.stats.requestsSent++;
     });
@@ -224,12 +226,10 @@ export class AgentCommunication {
     content: string,
     data?: Record<string, unknown>,
   ): Promise<void> {
-    const originalRequest = this.pendingRequests.get(originalMessageId);
-
     const message: AgentMessage = {
       id: this.generateMessageId(),
-      type: 'response',
-      priority: 'urgent',
+      type: "response",
+      priority: "urgent",
       from,
       to,
       content,
@@ -263,8 +263,8 @@ export class AgentCommunication {
 
     const message: AgentMessage = {
       id: this.generateMessageId(),
-      type: 'broadcast',
-      priority: 'normal',
+      type: "broadcast",
+      priority: "normal",
       from,
       to: Array.from(channel.subscribers),
       content,
@@ -272,8 +272,8 @@ export class AgentCommunication {
       timestamp: Date.now(),
       channelId,
       headers: {
-        'Broadcast-Channel': channelId,
-        'Subscriber-Count': channel.subscribers.size.toString(),
+        "Broadcast-Channel": channelId,
+        "Subscriber-Count": channel.subscribers.size.toString(),
       },
     };
 
@@ -281,7 +281,9 @@ export class AgentCommunication {
 
     this.stats.broadcastsSent++;
 
-    console.log(`[Comm] Broadcast: ${from} → ${channelId} (${channel.subscribers.size} subscribers)`);
+    console.log(
+      `[Comm] Broadcast: ${from} → ${channelId} (${channel.subscribers.size} subscribers)`,
+    );
 
     return channel.subscribers.size;
   }
@@ -373,7 +375,7 @@ export class AgentCommunication {
     // 发布事件
     for (const to of destinations) {
       await this.eventBus.publish({
-        type: 'AGENT_MESSAGE_RECEIVED',
+        type: "AGENT_MESSAGE_RECEIVED",
         sourceAgent: message.from,
         targetAgent: to,
         payload: {
@@ -393,12 +395,12 @@ export class AgentCommunication {
     // 统计
     this.stats.messagesReceived++;
 
-    if (message.type === 'broadcast') {
+    if (message.type === "broadcast") {
       this.stats.broadcastsReceived++;
     }
 
     // 处理响应
-    if (message.type === 'response' && message.correlationId) {
+    if (message.type === "response" && message.correlationId) {
       const pending = this.pendingRequests.get(message.correlationId);
 
       if (pending) {
@@ -466,7 +468,7 @@ export class AgentCommunication {
             deadlockAgents.add(waitingChain[i]);
           }
 
-          console.log(`[Comm] Deadlock detected: ${Array.from(deadlockAgents).join(' → ')}`);
+          console.log(`[Comm] Deadlock detected: ${Array.from(deadlockAgents).join(" → ")}`);
 
           return {
             detected: true,
@@ -488,7 +490,7 @@ export class AgentCommunication {
    * 解决死锁（超时强制回收）
    */
   resolveDeadlock(agents: string[]): void {
-    console.log(`[Comm] Resolving deadlock for agents: ${agents.join(', ')}`);
+    console.log(`[Comm] Resolving deadlock for agents: ${agents.join(", ")}`);
 
     for (const agent of agents) {
       // 查找这个 agent 的所有请求
@@ -533,7 +535,7 @@ export class AgentCommunication {
    * 生成消息 ID
    */
   private generateMessageId(): string {
-    return `msg_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`;
+    return `msg_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`;
   }
 
   /**
@@ -547,7 +549,7 @@ export class AgentCommunication {
    * 获取待处理请求
    */
   getPendingRequests(): AgentMessage[] {
-    return Array.from(this.pendingRequests.values()).map(p => p.message);
+    return Array.from(this.pendingRequests.values()).map((p) => p.message);
   }
 
   /**
@@ -564,7 +566,7 @@ export class AgentCommunication {
     // 取消所有待处理请求
     for (const [, pending] of this.pendingRequests.entries()) {
       clearTimeout(pending.timer);
-      pending.reject(new Error('Communication reset'));
+      pending.reject(new Error("Communication reset"));
     }
 
     this.pendingRequests.clear();
@@ -584,6 +586,6 @@ export class AgentCommunication {
       deadlocksResolved: 0,
     };
 
-    console.log('[Comm] Communication framework reset');
+    console.log("[Comm] Communication framework reset");
   }
 }

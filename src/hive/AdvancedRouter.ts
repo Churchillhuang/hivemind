@@ -8,18 +8,15 @@
  * - 任务依赖 DAG
  */
 
-import type { BaseAgent } from '../core/Agent.js';
-import { randomInt, randomUUID } from 'node:crypto';
-import { getGlobalEventBus } from '../events/EventBus.js';
-import type { Event } from '../events/Event.js';
-import { EventType } from '../events/Event.js';
-import type { HiveConfig } from '../hive/HiveConfig.js';
-import type { Task, TaskResult } from './Orchestrator.js';
+import { randomInt, randomUUID } from "node:crypto";
+import type { BaseAgent } from "../core/Agent.js";
+import type { HiveConfig } from "../hive/HiveConfig.js";
+import type { Task } from "./Orchestrator.js";
 
 /**
  * 任务优先级
  */
-export type TaskPriority = 'critical' | 'high' | 'normal' | 'low';
+export type TaskPriority = "critical" | "high" | "normal" | "low";
 
 /**
  * 任务依赖
@@ -56,7 +53,7 @@ export interface TaskPriorityConfig {
 /**
  * 负载均衡策略
  */
-export type LoadBalancingStrategy = 'round-robin' | 'least-loaded' | 'random' | 'specialized';
+export type LoadBalancingStrategy = "round-robin" | "least-loaded" | "random" | "specialized";
 
 /**
  * 高级路由配置
@@ -110,7 +107,7 @@ export class AdvancedRouter {
   constructor(config: AdvancedRouterConfig, hiveConfig: HiveConfig) {
     this.config = {
       priorityConfig: config.priorityConfig || {
-        defaultPriority: 'normal',
+        defaultPriority: "normal",
         priorityWeights: {
           critical: 10,
           high: 5,
@@ -119,7 +116,7 @@ export class AdvancedRouter {
         },
         ageBonus: 0.1, // 每秒 +0.1
       },
-      loadBalancing: config.loadBalancing || 'least-loaded',
+      loadBalancing: config.loadBalancing || "least-loaded",
       enableTaskDeps: config.enableTaskDeps !== false,
       maxQueueSize: config.maxQueueSize || 1000,
       priorityQueueSize: config.priorityQueueSize || 100,
@@ -129,17 +126,17 @@ export class AdvancedRouter {
     this.hiveConfig = hiveConfig;
 
     // 初始化优先级队列
-    this.priorityQueue.set('critical', []);
-    this.priorityQueue.set('high', []);
-    this.priorityQueue.set('normal', []);
-    this.priorityQueue.set('low', []);
+    this.priorityQueue.set("critical", []);
+    this.priorityQueue.set("high", []);
+    this.priorityQueue.set("normal", []);
+    this.priorityQueue.set("low", []);
   }
 
   /**
    * 添加任务到队列
    */
   async enqueue(task: Task, priority?: TaskPriority): Promise<{ queued: boolean; taskId: string }> {
-    const taskId = task.id || `task_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`;
+    const taskId = task.id || `task_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`;
 
     // 检查队列大小
     if (this.taskQueue.size >= this.config.maxQueueSize) {
@@ -170,7 +167,11 @@ export class AdvancedRouter {
     }
 
     // 如果有任务依赖，注册
-    if (this.config.enableTaskDeps && priorityTask.dependentTask && priorityTask.dependentTask.length > 0) {
+    if (
+      this.config.enableTaskDeps &&
+      priorityTask.dependentTask &&
+      priorityTask.dependentTask.length > 0
+    ) {
       this.registerDependency(taskId, priorityTask.dependentTask);
     }
 
@@ -208,7 +209,7 @@ export class AdvancedRouter {
     this.taskQueue.delete(task.id);
     const queue = this.priorityQueue.get(task.priority);
     if (queue) {
-      const index = queue.findIndex(t => t.id === task.id);
+      const index = queue.findIndex((t) => t.id === task.id);
       if (index > -1) {
         queue.splice(index, 1);
       }
@@ -218,7 +219,8 @@ export class AdvancedRouter {
 
     // 更新平均路由时间
     const routingTime = Date.now() - startTime;
-    this.stats.avgRoutingTime = (this.stats.avgRoutingTime * (this.stats.routed - 1) + routingTime) / this.stats.routed;
+    this.stats.avgRoutingTime =
+      (this.stats.avgRoutingTime * (this.stats.routed - 1) + routingTime) / this.stats.routed;
 
     console.log(`[Router] Task routed: ${task.id} → ${targetAgent.id} (${task.priority})`);
 
@@ -233,7 +235,7 @@ export class AdvancedRouter {
    */
   private getNextTask(): PriorityTask | null {
     // 按优先级顺序检查队列
-    const priorities: TaskPriority[] = ['critical', 'high', 'normal', 'low'];
+    const priorities: TaskPriority[] = ["critical", "high", "normal", "low"];
 
     for (const priority of priorities) {
       const queue = this.priorityQueue.get(priority);
@@ -249,8 +251,8 @@ export class AdvancedRouter {
           const ageA = (now - a.createdAt) / 1000; // 秒
           const ageB = (now - b.createdAt) / 1000;
 
-          const scoreA = weightA + (ageA * ageBonusWeight);
-          const scoreB = weightB + (ageB * ageBonusWeight);
+          const scoreA = weightA + ageA * ageBonusWeight;
+          const scoreB = weightB + ageB * ageBonusWeight;
 
           return scoreB - scoreA; // 降序
         });
@@ -278,24 +280,27 @@ export class AdvancedRouter {
   /**
    * 选择最佳 Agent
    */
-  private async selectBestAgent(task: PriorityTask, agents: BaseAgent[]): Promise<BaseAgent | null> {
-    const availableAgents = agents.filter(a => a.isRunning);
+  private async selectBestAgent(
+    task: PriorityTask,
+    agents: BaseAgent[],
+  ): Promise<BaseAgent | null> {
+    const availableAgents = agents.filter((a) => a.isRunning());
 
     if (availableAgents.length === 0) {
       return null;
     }
 
     switch (this.config.loadBalancing) {
-      case 'round-robin':
+      case "round-robin":
         return this.roundRobinSelect(task, availableAgents);
 
-      case 'least-loaded':
+      case "least-loaded":
         return this.leastLoadedSelect(task, availableAgents);
 
-      case 'random':
+      case "random":
         return this.randomSelect(task, availableAgents);
 
-      case 'specialized':
+      case "specialized":
         return this.specializedSelect(task, availableAgents);
 
       default:
@@ -386,20 +391,28 @@ export class AdvancedRouter {
     const types: string[] = [];
     const content = task.content.toLowerCase();
 
-    if (content.includes('write') || content.includes('create') || content.includes('compose')) {
-      types.push('content_writing');
+    if (content.includes("write") || content.includes("create") || content.includes("compose")) {
+      types.push("content_writing");
     }
-    if (content.includes('search') || content.includes('find') || content.includes('lookup')) {
-      types.push('search');
+    if (content.includes("search") || content.includes("find") || content.includes("lookup")) {
+      types.push("search");
     }
-    if (content.includes('analyze') || content.includes('understand') || content.includes('explain')) {
-      types.push('analysis');
+    if (
+      content.includes("analyze") ||
+      content.includes("understand") ||
+      content.includes("explain")
+    ) {
+      types.push("analysis");
     }
-    if (content.includes('schedule') || content.includes('calendar') || content.includes('appointment')) {
-      types.push('scheduling');
+    if (
+      content.includes("schedule") ||
+      content.includes("calendar") ||
+      content.includes("appointment")
+    ) {
+      types.push("scheduling");
     }
-    if (content.includes('email') || content.includes('message') || content.includes('send')) {
-      types.push('messaging');
+    if (content.includes("email") || content.includes("message") || content.includes("send")) {
+      types.push("messaging");
     }
 
     return types;
@@ -419,13 +432,18 @@ export class AdvancedRouter {
       specializations,
     });
 
-    console.log(`[Router] Agent load registered: ${agentId} (${specializations.join(', ')})`);
+    console.log(`[Router] Agent load registered: ${agentId} (${specializations.join(", ")})`);
   }
 
   /**
    * 更新 Agent 负载
    */
-  updateAgentLoad(agentId: string, currentDelta: number, completedDelta: number, failedDelta: number): void {
+  updateAgentLoad(
+    agentId: string,
+    currentDelta: number,
+    completedDelta: number,
+    failedDelta: number,
+  ): void {
     const load = this.agentLoads.get(agentId);
 
     if (!load) {
@@ -470,7 +488,7 @@ export class AdvancedRouter {
       failed: [],
     });
 
-    console.log(`[Router] Dependency registered: ${taskId} depends on [${dependsOn.join(', ')}]`);
+    console.log(`[Router] Dependency registered: ${taskId} depends on [${dependsOn.join(", ")}]`);
   }
 
   /**
@@ -478,7 +496,7 @@ export class AdvancedRouter {
    */
   private checkDependencyReady(dep: TaskDependency): boolean {
     // 所有依赖任务必须完成
-    const allCompleted = dep.dependsOn.every(depId => dep.completed.includes(depId));
+    const allCompleted = dep.dependsOn.every((depId) => dep.completed.includes(depId));
 
     // 如果有依赖任务失败，则任务无法完成
     if (dep.failed.length > 0) {
@@ -536,9 +554,9 @@ export class AdvancedRouter {
       low: 0,
     };
 
-    for (const [taskId, task] of this.taskQueue.entries()) {
+    for (const [_taskId, task] of this.taskQueue.entries()) {
       byPriority[task.priority]++;
-      totalWaitTime += (now - task.createdAt);
+      totalWaitTime += now - task.createdAt;
     }
 
     const avgWaitTime = this.taskQueue.size > 0 ? totalWaitTime / this.taskQueue.size : 0;
@@ -569,10 +587,10 @@ export class AdvancedRouter {
    */
   reset() {
     this.taskQueue.clear();
-    this.priorityQueue.forEach(queue => queue.length = 0);
+    this.priorityQueue.forEach((queue) => (queue.length = 0));
     this.taskDependencies.clear();
     this.roundRobinIndex = 0;
 
-    console.log('[Router] Reset');
+    console.log("[Router] Reset");
   }
 }

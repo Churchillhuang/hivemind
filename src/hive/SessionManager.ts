@@ -4,9 +4,9 @@
  * 管理 OpenClaw session 数据，支持多 agent 上下文
  */
 
-import { promises as fs } from 'fs';
-import path from 'path';
-import type { HiveConfig } from '../hive/HiveConfig.js';
+import { promises as fs } from "fs";
+import path from "path";
+import type { HiveConfig } from "../hive/HiveConfig.js";
 
 /**
  * OpenClaw Session Entry
@@ -29,11 +29,11 @@ export interface SessionEntry {
   };
   // HiveMind 扩展字段
   hiveMind?: {
-    agents: string[];           // 参与的 agents
-    primaryAgent: string;       // 主要 agent
-    orchestratorId?: string;    // Orchestrator ID
-    mode: 'single' | 'multi';   // 运行模式
-    createdAt?: number;         // HiveMind 开始参与时间
+    agents: string[]; // 参与的 agents
+    primaryAgent: string; // 主要 agent
+    orchestratorId?: string; // Orchestrator ID
+    mode: "single" | "multi"; // 运行模式
+    createdAt?: number; // HiveMind 开始参与时间
   };
 }
 
@@ -58,12 +58,12 @@ export class SessionManager {
   constructor(
     agentId: string,
     hiveConfig: HiveConfig,
-    basePath: string = '/root/.openclaw/agents',
+    basePath: string = "/root/.openclaw/agents",
   ) {
     this.agentId = agentId;
     this.hiveConfig = hiveConfig;
-    this.sessionsPath = path.join(basePath, agentId, 'sessions', 'sessions.json');
-    this.transcriptsPath = path.join(basePath, agentId, 'sessions');
+    this.sessionsPath = path.join(basePath, agentId, "sessions", "sessions.json");
+    this.transcriptsPath = path.join(basePath, agentId, "sessions");
   }
 
   /**
@@ -71,12 +71,12 @@ export class SessionManager {
    */
   async loadStore(): Promise<SessionStore> {
     try {
-      const content = await fs.readFile(this.sessionsPath, 'utf-8');
+      const content = await fs.readFile(this.sessionsPath, "utf-8");
       this.store = JSON.parse(content);
       this.lastLoadTime = Date.now();
       return this.store!;
     } catch (error) {
-      if ((error as any).code === 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         // 文件不存在，创建新的
         this.store = {};
         return this.store;
@@ -94,11 +94,7 @@ export class SessionManager {
     }
 
     await fs.mkdir(path.dirname(this.sessionsPath), { recursive: true });
-    await fs.writeFile(
-      this.sessionsPath,
-      JSON.stringify(this.store, null, 2),
-      'utf-8',
-    );
+    await fs.writeFile(this.sessionsPath, JSON.stringify(this.store, null, 2), "utf-8");
     this.lastLoadTime = Date.now();
   }
 
@@ -142,7 +138,7 @@ export class SessionManager {
 
     if (activeMinutes !== undefined) {
       const cutoff = Date.now() - activeMinutes * 60 * 1000;
-      return entries.filter(e => e.updatedAt > cutoff);
+      return entries.filter((e) => e.updatedAt > cutoff);
     }
 
     return entries;
@@ -161,7 +157,11 @@ export class SessionManager {
   /**
    * 添加 HiveMind agent 到 session
    */
-  async addAgentToSession(sessionKey: string, agentId: string, isPrimary: boolean = false): Promise<void> {
+  async addAgentToSession(
+    sessionKey: string,
+    agentId: string,
+    isPrimary: boolean = false,
+  ): Promise<void> {
     const entry = await this.getEntry(sessionKey);
     if (!entry) {
       throw new Error(`Session entry not found: ${sessionKey}`);
@@ -170,7 +170,7 @@ export class SessionManager {
     if (!entry.hiveMind) {
       entry.hiveMind = {
         agents: [],
-        primaryAgent: '',
+        primaryAgent: "",
         mode: this.hiveConfig.mode,
       };
     }
@@ -201,11 +201,11 @@ export class SessionManager {
       return;
     }
 
-    entry.hiveMind.agents = entry.hiveMind.agents.filter(a => a !== agentId);
+    entry.hiveMind.agents = entry.hiveMind.agents.filter((a) => a !== agentId);
 
     // 如果移除的 agent 是主要 agent，选择第一个作为新的主要
     if (entry.hiveMind.primaryAgent === agentId) {
-      entry.hiveMind.primaryAgent = entry.hiveMind.agents[0] || '';
+      entry.hiveMind.primaryAgent = entry.hiveMind.agents[0] || "";
     }
 
     await this.updateEntry(sessionKey, { hiveMind: entry.hiveMind });
@@ -223,7 +223,7 @@ export class SessionManager {
     if (!entry.hiveMind) {
       entry.hiveMind = {
         agents: [],
-        primaryAgent: '',
+        primaryAgent: "",
         mode: this.hiveConfig.mode,
       };
     }
@@ -242,15 +242,16 @@ export class SessionManager {
   /**
    * 读取 transcript
    */
-  async readTranscript(sessionId: string): Promise<any[]> {
+  async readTranscript(sessionId: string): Promise<unknown[]> {
     const transcriptPath = this.getTranscriptPath(sessionId);
     try {
-      const content = await fs.readFile(transcriptPath, 'utf-8');
-      return content.split('\n')
-        .filter(line => line.trim())
-        .map(line => JSON.parse(line));
+      const content = await fs.readFile(transcriptPath, "utf-8");
+      return content
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line));
     } catch (error) {
-      if ((error as any).code === 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return [];
       }
       throw error;
@@ -260,10 +261,10 @@ export class SessionManager {
   /**
    * 写入 transcript
    */
-  async writeTranscript(sessionId: string, line: any): Promise<void> {
+  async writeTranscript(sessionId: string, line: unknown): Promise<void> {
     const transcriptPath = this.getTranscriptPath(sessionId);
     await fs.mkdir(this.transcriptsPath, { recursive: true });
-    await fs.appendFile(transcriptPath, JSON.stringify(line) + '\n', 'utf-8');
+    await fs.appendFile(transcriptPath, JSON.stringify(line) + "\n", "utf-8");
   }
 
   /**
@@ -271,12 +272,12 @@ export class SessionManager {
    */
   async getStats(): Promise<{
     totalSessions: number;
-    activeSessions: number;  // 最近 1 小时
-    hiveMindSessions: number;  // 有 HiveMind 数据的 sessions
+    activeSessions: number; // 最近 1 小时
+    hiveMindSessions: number; // 有 HiveMind 数据的 sessions
   }> {
     const allSessions = await this.listSessions();
     const activeSessions = await this.listSessions(60);
-    const hiveMindSessions = allSessions.filter(s => s.hiveMind).length;
+    const hiveMindSessions = allSessions.filter((s) => s.hiveMind).length;
 
     return {
       totalSessions: allSessions.length,

@@ -41,7 +41,7 @@ export interface SkillRecord {
    * - 'tool': 工具技能（python、wget、curl...）
    * - 'method': 方法技能（分析、综合、翻译...）
    */
-  type: 'domain' | 'tool' | 'method';
+  type: "domain" | "tool" | "method";
 
   /**
    * 技能标签（用于灵活匹配）
@@ -71,11 +71,14 @@ export interface SkillProfile {
    * 这里存储的是"预学习"的技能，但没有实际做过
    * Agent 可以通过这些技能快速适应新任务
    */
-  activeSkills: Map<string, {
-    skillName: string;
-    confidence: number;  // 0-1，提炼时的信心度
-    extractedAt: number; // 提取时间
-  }>;
+  activeSkills: Map<
+    string,
+    {
+      skillName: string;
+      confidence: number; // 0-1，提炼时的信心度
+      extractedAt: number; // 提取时间
+    }
+  >;
 
   /**
    * 探索设置
@@ -152,7 +155,7 @@ export interface TaskSkillRequirement {
    * - 'any': 只需满足任意一个 requiredSkills
    * - 'majority': 至少满足 50% 以上
    */
-  matchMode: 'all' | 'any' | 'majority';
+  matchMode: "all" | "any" | "majority";
 }
 
 /**
@@ -199,15 +202,15 @@ export class SkillfulAgent {
       dynamicSkills: new Map(),
       activeSkills: new Map(),
       exploration: {
-        probability: 0.1,  // 默认 10% 探索概率
-        maxTryTime: 300,   // 最多尝试 5 分钟
-        maxRetries: 3,     // 最多重试 3 次
+        probability: 0.1, // 默认 10% 探索概率
+        maxTryTime: 300, // 最多尝试 5 分钟
+        maxRetries: 3, // 最多重试 3 次
       },
       decay: {
-        interval: 86400,   // 24 小时衰减一次
-        rate: 0.1,         // 每次衰减 10%
-        minScore: 0.3,     // 最低保留 0.3
-        protectionPeriod: 2592000,  // 30 天内的技能不衰减
+        interval: 86400, // 24 小时衰减一次
+        rate: 0.1, // 每次衰减 10%
+        minScore: 0.3, // 最低保留 0.3
+        protectionPeriod: 2592000, // 30 天内的技能不衰减
       },
     };
   }
@@ -224,8 +227,8 @@ export class SkillfulAgent {
     skillName: string,
     success: boolean,
     duration: number,
-    type: 'domain' | 'tool' | 'method' = 'domain',
-    tags: string = ''
+    type: "domain" | "tool" | "method" = "domain",
+    tags: string = "",
   ): void {
     const existing = this.skillProfile.dynamicSkills.get(skillName);
 
@@ -237,7 +240,7 @@ export class SkillfulAgent {
       lastUsed: 0,
       type,
       tags,
-      minSuccesses: 3,  // 默认需要至少 3 次成功才算"熟练"
+      minSuccesses: 3, // 默认需要至少 3 次成功才算"熟练"
     };
 
     // 更新计数
@@ -261,9 +264,9 @@ export class SkillfulAgent {
 
     this.skillProfile.dynamicSkills.set(skillName, record);
 
-    console.log(`[${this.getId()}] Skill updated: ${skillName}`)
-      console.log(`  Score: ${record.score.toFixed(3)} (${record.successCount}/${record.count})`);
-      console.log(`  Avg Time: ${record.avgTime.toFixed(1)}s`);
+    console.log(`[${this.getId()}] Skill updated: ${skillName}`);
+    console.log(`  Score: ${record.score.toFixed(3)} (${record.successCount}/${record.count})`);
+    console.log(`  Avg Time: ${record.avgTime.toFixed(1)}s`);
   }
 
   /**
@@ -290,7 +293,7 @@ export class SkillfulAgent {
     }
 
     switch (matchMode) {
-      case 'all':
+      case "all":
         // 必须满足所有技能
         for (const [skill, minScore] of requiredSkills.entries()) {
           const myScore = this.getSkillScore(skill);
@@ -300,7 +303,7 @@ export class SkillfulAgent {
         }
         return true;
 
-      case 'any':
+      case "any":
         // 只需满足任意一个
         for (const [skill, minScore] of requiredSkills.entries()) {
           const myScore = this.getSkillScore(skill);
@@ -310,7 +313,7 @@ export class SkillfulAgent {
         }
         return false;
 
-      case 'majority':
+      case "majority":
         // 至少满足 50%
         let metCount = 0;
         for (const [skill, minScore] of requiredSkills.entries()) {
@@ -336,7 +339,7 @@ export class SkillfulAgent {
     const { requiredSkills, optionalSkills } = requirements;
 
     if (requiredSkills.size === 0) {
-      return 1.0;  // 没有需求，完全匹配
+      return 1.0; // 没有需求，完全匹配
     }
 
     // 计算需要技能的匹配度
@@ -376,7 +379,9 @@ export class SkillfulAgent {
       extractedAt: Date.now(),
     });
 
-    console.log(`[${this.getId()}] Active skill loaded: ${skillName} (confidence: ${(confidence * 100).toFixed(0)}%)`);
+    console.log(
+      `[${this.getId()}] Active skill loaded: ${skillName} (confidence: ${(confidence * 100).toFixed(0)}%)`,
+    );
   }
 
   /**
@@ -410,8 +415,8 @@ export class SkillfulAgent {
 
         record.score = newScore;
 
-        console.log(`[${this.getId()}] Skill decayed: ${skillName}`)
-          console.log(`  ${record.score.toFixed(3)} → ${newScore.toFixed(3)}`);
+        console.log(`[${this.getId()}] Skill decayed: ${skillName}`);
+        console.log(`  ${record.score.toFixed(3)} → ${newScore.toFixed(3)}`);
       }
     }
   }
@@ -424,7 +429,7 @@ export class SkillfulAgent {
    */
   shouldExplore(
     taskSkillRequirements: TaskSkillRequirement,
-    currentSkillMatchScore: number
+    currentSkillMatchScore: number,
   ): boolean {
     // 探索概率
     if (Math.random() < this.skillProfile.exploration.probability) {
@@ -435,7 +440,7 @@ export class SkillfulAgent {
     if (currentSkillMatchScore === 0) {
       for (const skillName of taskSkillRequirements.requiredSkills.keys()) {
         if (this.skillProfile.activeSkills.has(skillName)) {
-          return true;  // 有预学习的技能，值得尝试
+          return true; // 有预学习的技能，值得尝试
         }
       }
     }
@@ -466,12 +471,12 @@ export class SkillfulAgent {
     const avgScore = totalScore / skills.length;
 
     const topSkills = skills
-      .map(skill => ({
+      .map((skill) => ({
         name: skill.type,
         score: skill.score,
         count: skill.count,
       }))
-      .sort((a, b) => b.score - a.score)
+      .toSorted((a, b) => b.score - a.score)
       .slice(0, 5);
 
     return {
@@ -485,6 +490,6 @@ export class SkillfulAgent {
    * 抽象方法，需要子类实现
    */
   protected getId(): string {
-    throw new Error('getId() must be implemented by subclass');
+    throw new Error("getId() must be implemented by subclass");
   }
 }

@@ -4,11 +4,11 @@
  * 使用 L4 记忆（抽样 1-2 周），定期自我评估
  */
 
-import { BaseAgent } from '../core/Agent.js';
-import { Event, EventType } from '../events/Event.js';
-import { EventBus } from '../events/EventBus.js';
-import type { HiveConfig } from '../hive/HiveConfig.js';
-import type { AgentInfo } from './Orchestrator.js';
+import { BaseAgent } from "../core/Agent.js";
+import { Event, EventType } from "../events/Event.js";
+import { EventBus } from "../events/EventBus.js";
+import type { HiveConfig } from "../hive/HiveConfig.js";
+import type { AgentInfo } from "./Orchestrator.js";
 
 /**
  * Reflection - 反思记录
@@ -16,8 +16,8 @@ import type { AgentInfo } from './Orchestrator.js';
 export interface Reflection {
   id: string;
   timestamp: number;
-  type: 'self' | 'agent' | 'system';
-  subject: string;  // 被评估的 agent 或系统
+  type: "self" | "agent" | "system";
+  subject: string; // 被评估的 agent 或系统
   findings: ReflectionFinding[];
   recommendations: ReflectionRecommendation[];
   summary: string;
@@ -27,19 +27,19 @@ export interface Reflection {
  * ReflectionFinding - 发现的问题或模式
  */
 export interface ReflectionFinding {
-  type: 'strength' | 'weakness' | 'pattern' | 'anomaly';
+  type: "strength" | "weakness" | "pattern" | "anomaly";
   description: string;
   evidence: string[];
-  severity: 'low' | 'medium' | 'high';
+  severity: "low" | "medium" | "high";
 }
 
 /**
  * ReflectionRecommendation - 基于反思的建议
  */
 export interface ReflectionRecommendation {
-  type: 'improvement' | 'optimization' | 'investigation';
+  type: "improvement" | "optimization" | "investigation";
   description: string;
-  priority: 'low' | 'medium' | 'high';
+  priority: "low" | "medium" | "high";
   relatedFindings: string[];
 }
 
@@ -66,12 +66,15 @@ export class ReflectionAgent extends BaseAgent {
     hiveConfig: HiveConfig,
     eventBus?: EventBus,
   ) {
-    super({
-      id: config.id,
-      role: config.role,
-      type: 'system',
-      description: config.description,
-    }, eventBus);
+    super(
+      {
+        id: config.id,
+        role: config.role,
+        type: "system",
+        description: config.description,
+      },
+      eventBus,
+    );
 
     this.hiveConfig = hiveConfig;
   }
@@ -88,7 +91,7 @@ export class ReflectionAgent extends BaseAgent {
     this.subscribeTo(EventType.TASK_COMPLETED);
     this.subscribeTo(EventType.AGENT_ERROR);
     this.subscribeTo(EventType.SKILL_LEARNED);
-    this.subscribeTo('REFLECTION_REQUESTED'); // 手动触发
+    this.subscribeTo("REFLECTION_REQUESTED"); // 手动触发
 
     // 启动定期反思
     this.startReflectionSchedule();
@@ -99,7 +102,7 @@ export class ReflectionAgent extends BaseAgent {
       payload: {
         agentId: this.id,
         role: this.role,
-        schedule: 'reflection_interval_ms',
+        schedule: "reflection_interval_ms",
         interval: 60000, // 1 分钟（MVP）
       },
     });
@@ -134,23 +137,23 @@ export class ReflectionAgent extends BaseAgent {
 
   async handle(event: Event): Promise<void> {
     switch (event.type) {
-      case EventType.MESSAGE_PROCESSED:
+      case "MESSAGE_PROCESSED":
         await this.trackMessageProcessing(event);
         break;
 
-      case EventType.TASK_COMPLETED:
+      case "TASK_COMPLETED":
         await this.onTaskCompleted(event);
         break;
 
-      case EventType.AGENT_ERROR:
+      case "AGENT_ERROR":
         await this.onAgentError(event);
         break;
 
-      case EventType.SKILL_LEARNED:
+      case "SKILL_LEARNED":
         await this.onSkillLearned(event);
         break;
 
-      case 'REFLECTION_REQUESTED':
+      case "REFLECTION_REQUESTED":
         await this.performReflection();
         break;
     }
@@ -188,8 +191,8 @@ export class ReflectionAgent extends BaseAgent {
     const reflection: Reflection = {
       id: `ref_${Date.now()}`,
       timestamp: Date.now(),
-      type: 'self',
-      subject: 'System',
+      type: "self",
+      subject: "System",
       findings,
       recommendations,
       summary: this.generateSummary(findings, recommendations),
@@ -200,7 +203,7 @@ export class ReflectionAgent extends BaseAgent {
 
     // 发布反思事件
     await this.eventBus?.publish({
-      type: 'SELF_REFLECTION',
+      type: "SELF_REFLECTION",
       sourceAgent: this.id,
       payload: reflection,
     });
@@ -233,8 +236,8 @@ export class ReflectionAgent extends BaseAgent {
     // 统计最近的错误（假设有记录）
     // MVP: 简化处理，从反思历史中提取
     const recentReflections = Array.from(this.reflections.values()).slice(-5);
-    recentReflections.forEach(ref => {
-      const errorFindings = ref.findings.filter(f => f.type === 'weakness');
+    recentReflections.forEach((ref) => {
+      const errorFindings = ref.findings.filter((f) => f.type === "weakness");
       recentErrors += errorFindings.length;
     });
 
@@ -264,64 +267,62 @@ export class ReflectionAgent extends BaseAgent {
       const successRate = state.completedTasks / state.totalTasks;
       if (successRate >= 0.9) {
         findings.push({
-          type: 'strength',
+          type: "strength",
           description: `High task success rate (${(successRate * 100).toFixed(1)}%)`,
-          evidence: [
-            `Completed: ${state.completedTasks}/${state.totalTasks}`,
-          ],
-          severity: 'low',
+          evidence: [`Completed: ${state.completedTasks}/${state.totalTasks}`],
+          severity: "low",
         });
       } else if (successRate < 0.7) {
         findings.push({
-          type: 'weakness',
+          type: "weakness",
           description: `Low task success rate (${(successRate * 100).toFixed(1)}%)`,
           evidence: [
             `Completed: ${state.completedTasks}/${state.totalTasks}`,
             `Failed: ${state.failedTasks}`,
           ],
-          severity: 'high',
+          severity: "high",
         });
       }
     }
 
     // 2. Agent 不平衡问题
-    const activeAgents = state.agentStats.filter(a => a.isRunning).length;
+    const activeAgents = state.agentStats.filter((a) => a.isRunning).length;
     if (activeAgents === 0) {
       findings.push({
-        type: 'anomaly',
-        description: 'No active agents detected',
+        type: "anomaly",
+        description: "No active agents detected",
         evidence: [],
-        severity: 'high',
+        severity: "high",
       });
     } else if (activeAgents === 1) {
       findings.push({
-        type: 'pattern',
-        description: 'Single agent handling all tasks - consider adding more agents',
+        type: "pattern",
+        description: "Single agent handling all tasks - consider adding more agents",
         evidence: [`Active agents: ${activeAgents}`],
-        severity: 'medium',
+        severity: "medium",
       });
     }
 
     // 3. 错误模式
     if (state.recentErrors > 5) {
       findings.push({
-        type: 'weakness',
+        type: "weakness",
         description: `High error frequency detected (${state.recentErrors} errors in recent reflections)`,
         evidence: [`Recent errors: ${state.recentErrors}`],
-        severity: 'high',
+        severity: "high",
       });
     }
 
     // 4. 技能使用模式
-    const unusedSkills = Array.from(this.skillStore.values())
-      .filter(s => s.usageCount === 0 && s.learned)
-      .length;
+    const unusedSkills = Array.from(this.skillStore.values()).filter(
+      (s) => s.usageCount === 0 && s.learned,
+    ).length;
     if (unusedSkills > 0) {
       findings.push({
-        type: 'pattern',
+        type: "pattern",
         description: `${unusedSkills} learned skills not being used`,
         evidence: [],
-        severity: 'low',
+        severity: "low",
       });
     }
 
@@ -335,39 +336,39 @@ export class ReflectionAgent extends BaseAgent {
     const recommendations: ReflectionRecommendation[] = [];
 
     // 基于发现生成建议
-    const hasLowSuccessRate = findings.some(f =>
-      f.type === 'weakness' && f.description.includes('Low task success rate'),
+    const hasLowSuccessRate = findings.some(
+      (f) => f.type === "weakness" && f.description.includes("Low task success rate"),
     );
     if (hasLowSuccessRate) {
       recommendations.push({
-        type: 'improvement',
-        description: 'Review error patterns and improve error handling in agents',
-        priority: 'high',
-        relatedFindings: findings.filter(f => f.type === 'weakness').map(f => f.description),
+        type: "improvement",
+        description: "Review error patterns and improve error handling in agents",
+        priority: "high",
+        relatedFindings: findings.filter((f) => f.type === "weakness").map((f) => f.description),
       });
     }
 
-    const hasSingleAgent = findings.some(f =>
-      f.type === 'pattern' && f.description.includes('Single agent handling all tasks'),
+    const hasSingleAgent = findings.some(
+      (f) => f.type === "pattern" && f.description.includes("Single agent handling all tasks"),
     );
     if (hasSingleAgent) {
       recommendations.push({
-        type: 'optimization',
-        description: 'Consider adding specialized agents for better load distribution',
-        priority: 'medium',
-        relatedFindings: findings.filter(f => f.type === 'pattern').map(f => f.description),
+        type: "optimization",
+        description: "Consider adding specialized agents for better load distribution",
+        priority: "medium",
+        relatedFindings: findings.filter((f) => f.type === "pattern").map((f) => f.description),
       });
     }
 
-    const hasHighErrors = findings.some(f =>
-      f.type === 'weakness' && f.description.includes('High error frequency'),
+    const hasHighErrors = findings.some(
+      (f) => f.type === "weakness" && f.description.includes("High error frequency"),
     );
     if (hasHighErrors) {
       recommendations.push({
-        type: 'investigation',
-        description: 'Investigate root cause of frequent errors',
-        priority: 'high',
-        relatedFindings: findings.filter(f => f.type === 'weakness').map(f => f.description),
+        type: "investigation",
+        description: "Investigate root cause of frequent errors",
+        priority: "high",
+        relatedFindings: findings.filter((f) => f.type === "weakness").map((f) => f.description),
       });
     }
 
@@ -381,10 +382,10 @@ export class ReflectionAgent extends BaseAgent {
     findings: ReflectionFinding[],
     recommendations: ReflectionRecommendation[],
   ): string {
-    const strengths = findings.filter(f => f.type === 'strength').length;
-    const weaknesses = findings.filter(f => f.type === 'weakness').length;
-    const patterns = findings.filter(f => f.type === 'pattern').length;
-    const anomalies = findings.filter(f => f.type === 'anomaly').length;
+    const strengths = findings.filter((f) => f.type === "strength").length;
+    const weaknesses = findings.filter((f) => f.type === "weakness").length;
+    const patterns = findings.filter((f) => f.type === "pattern").length;
+    const anomalies = findings.filter((f) => f.type === "anomaly").length;
 
     let summary = `Reflection: ${strengths} strengths, ${weaknesses} weaknesses, ${patterns} patterns, ${anomalies} anomalies`;
 
@@ -414,7 +415,7 @@ export class ReflectionAgent extends BaseAgent {
   /**
    * 任务完成
    */
-  private async onTaskCompleted(event: Event): Promise<void> {
+  private async onTaskCompleted(_event: Event): Promise<void> {
     console.log(`[ReflectionAgent ${this.id}] Task completed`);
     // 可以在这里收集更详细的信息
   }
@@ -422,7 +423,7 @@ export class ReflectionAgent extends BaseAgent {
   /**
    * Agent 错误
    */
-  private async onAgentError(event: Event): Promise<void> {
+  private async onAgentError(_event: Event): Promise<void> {
     console.log(`[ReflectionAgent ${this.id}] Agent error detected`);
     // 收集错误信息用于反思
   }
@@ -459,8 +460,9 @@ export class ReflectionAgent extends BaseAgent {
    * 获取反思记录
    */
   getReflections(limit?: number): Reflection[] {
-    const reflections = Array.from(this.reflections.values())
-      .sort((a, b) => b.timestamp - a.timestamp);
+    const reflections = Array.from(this.reflections.values()).toSorted(
+      (a, b) => b.timestamp - a.timestamp,
+    );
     if (limit) {
       return reflections.slice(0, limit);
     }

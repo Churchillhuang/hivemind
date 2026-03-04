@@ -8,15 +8,15 @@
  * 4. 不再维护复杂的任务队列和状态
  */
 
-import { BaseAgent } from '../core/Agent.js';
-import type { Event } from '../events/Event.js';
-import { EventBus } from '../events/EventBus.js';
-import type { HiveConfig } from './HiveConfig.js';
-import { SimpleNegotiationRouter } from './SimpleNegotiationRouter.js';
+import { BaseAgent } from "../core/Agent.js";
+import type { Event } from "../events/Event.js";
+import { EventBus } from "../events/EventBus.js";
+import type { HiveConfig } from "./HiveConfig.js";
+import { SimpleNegotiationRouter } from "./SimpleNegotiationRouter.js";
 
 enum SimpleRoutingMode {
-  DIRECT = 'direct',
-  NEGOTIATED = 'negotiated',
+  DIRECT = "direct",
+  NEGOTIATED = "negotiated",
 }
 
 export interface SimpleRoutingDecision {
@@ -26,10 +26,17 @@ export interface SimpleRoutingDecision {
   reason: string;
 }
 
+type RequestedTaskPayload = {
+  taskId?: string;
+  taskType?: string;
+  description?: string;
+  payload?: unknown;
+};
+
 export class SimpleOrchestrator extends BaseAgent {
   private config: HiveConfig;
   private negotiationRouter?: SimpleNegotiationRouter;
-  private directRoutingRules: Map<string, string>;  // taskType -> agentId
+  private directRoutingRules: Map<string, string>; // taskType -> agentId
   private directRoutingTasks: Set<string>;
   private running: boolean = false;
 
@@ -60,14 +67,14 @@ export class SimpleOrchestrator extends BaseAgent {
    */
   private initializeDirectRoutingRules(): void {
     // 核心功能
-    this.directRoutingRules.set('message', 'interface_agent');
-    this.directRoutingRules.set('memory_query', 'memory_agent');
-    this.directRoutingRules.set('reflection', 'reflection_agent');
+    this.directRoutingRules.set("message", "interface_agent");
+    this.directRoutingRules.set("memory_query", "memory_agent");
+    this.directRoutingRules.set("reflection", "reflection_agent");
 
     // 标记为直路由任务
-    this.directRoutingTasks.add('message');
-    this.directRoutingTasks.add('memory_query');
-    this.directRoutingTasks.add('reflection');
+    this.directRoutingTasks.add("message");
+    this.directRoutingTasks.add("memory_query");
+    this.directRoutingTasks.add("reflection");
   }
 
   /**
@@ -87,7 +94,7 @@ export class SimpleOrchestrator extends BaseAgent {
     if (!this.negotiationRouter) {
       this.negotiationRouter = new SimpleNegotiationRouter(this.config, this.eventBus);
       this.negotiationRouter.start();
-      console.log('[SimpleOrchestrator] NegotiationRouter initialized');
+      console.log("[SimpleOrchestrator] NegotiationRouter initialized");
     }
   }
 
@@ -98,7 +105,7 @@ export class SimpleOrchestrator extends BaseAgent {
     taskId: string;
     taskType: string;
     description: string;
-    payload?: any;
+    payload?: unknown;
   }): Promise<void> {
     console.log(`[SimpleOrchestrator] New task: ${task.taskId} (${task.taskType})`);
 
@@ -133,7 +140,7 @@ export class SimpleOrchestrator extends BaseAgent {
     // 协商路由
     return {
       taskId: task.taskId,
-      targetAgent: null,  // 协商结果未知
+      targetAgent: null, // 协商结果未知
       routingMode: SimpleRoutingMode.NEGOTIATED,
       reason: `Negotiated routing: ${task.taskType}`,
     };
@@ -146,7 +153,7 @@ export class SimpleOrchestrator extends BaseAgent {
     if (decision.routingMode === SimpleRoutingMode.DIRECT && decision.targetAgent) {
       // 直接分配
       await this.eventBus?.publish({
-        type: 'TASK_ASSIGNED',
+        type: "TASK_ASSIGNED",
         payload: {
           taskId: decision.taskId,
           assignedTo: decision.targetAgent,
@@ -155,15 +162,14 @@ export class SimpleOrchestrator extends BaseAgent {
       });
 
       console.log(`[SimpleOrchestrator] Direct routing: ${decision.reason}`);
-
     } else if (decision.routingMode === SimpleRoutingMode.NEGOTIATED) {
       // 协商路由
       this.ensureNegotiationRouter();
       if (this.negotiationRouter) {
         this.negotiationRouter.announceTask({
           taskId: decision.taskId,
-          taskType: '',  // 将由其他机制填充
-          description: '',  // 将由其他机制填充
+          taskType: "", // 将由其他机制填充
+          description: "", // 将由其他机制填充
           timestamp: Date.now(),
         });
 
@@ -178,22 +184,22 @@ export class SimpleOrchestrator extends BaseAgent {
   async handle(event: Event): Promise<void> {
     // 简化处理：只关心 NEW_MESSAGE 和 TASK_REQUESTED
     switch (event.type) {
-      case 'NEW_MESSAGE': {
+      case "NEW_MESSAGE": {
         await this.handleNewTask({
           taskId: `task_${Date.now()}`,
-          taskType: 'message',
-          description: 'Handle user message',
+          taskType: "message",
+          description: "Handle user message",
           payload: event.payload,
         });
         break;
       }
 
-      case 'TASK_REQUESTED': {
-        const payload = event.payload as any;
+      case "TASK_REQUESTED": {
+        const payload = event.payload as RequestedTaskPayload;
         await this.handleNewTask({
           taskId: payload.taskId || `task_${Date.now()}`,
-          taskType: payload.taskType || 'generic',
-          description: payload.description || '',
+          taskType: payload.taskType || "generic",
+          description: payload.description || "",
           payload: payload.payload || {},
         });
         break;
@@ -215,11 +221,10 @@ export class SimpleOrchestrator extends BaseAgent {
     this.running = true;
 
     // 订阅事件
-    const eventBus = (this as any).eventBus;
-    eventBus?.subscribe('NEW_MESSAGE', this.handle.bind(this));
-    eventBus?.subscribe('TASK_REQUESTED', this.handle.bind(this));
+    this.eventBus?.subscribe("NEW_MESSAGE", this.handle.bind(this));
+    this.eventBus?.subscribe("TASK_REQUESTED", this.handle.bind(this));
 
-    console.log('[SimpleOrchestrator] Started');
+    console.log("[SimpleOrchestrator] Started");
   }
 
   /**
@@ -236,7 +241,7 @@ export class SimpleOrchestrator extends BaseAgent {
       this.negotiationRouter.stop();
     }
 
-    console.log('[SimpleOrchestrator] Stopped');
+    console.log("[SimpleOrchestrator] Stopped");
   }
 
   /**

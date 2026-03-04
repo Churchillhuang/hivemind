@@ -7,8 +7,8 @@
  * - 可视化协商过程
  */
 
-import { NegotiationRouter, type Bid, type TaskAnnouncement, type TaskAssignment } from './NegotiationRouter.js';
-import type { BidWithSkills } from './SkillProfile.js';
+import { NegotiationRouter, type Bid } from "./NegotiationRouter.js";
+import type { BidWithSkills } from "./SkillProfile.js";
 
 export class SkillBasedNegotiationRouter extends NegotiationRouter {
   /**
@@ -20,26 +20,26 @@ export class SkillBasedNegotiationRouter extends NegotiationRouter {
     }
 
     // 按评分排序（评分越低越好）
-    const sortedBids = [...bids].sort((a, b) => a.bidScore - b.bidScore);
+    const sortedBids = [...bids].toSorted((a, b) => a.bidScore - b.bidScore);
 
     const bestBid = sortedBids[0];
     const bestBidSkills = (bestBid as BidWithSkills).skillScores;
 
-    console.log(`[NegotiationRouter] Selected winner for task ${taskId}:`)
-    console.log(`  Agent: ${bestBid.agentId}`)
-    console.log(`  Score: ${bestBid.bidScore.toFixed(3)}`)
-    console.log(`  Load: ${bestBid.currentLoad.toFixed(2)}`)
-    console.log(`  Time: ${bestBid.estimatedTimeMs}ms`)
+    console.log(`[NegotiationRouter] Selected winner for task ${taskId}:`);
+    console.log(`  Agent: ${bestBid.agentId}`);
+    console.log(`  Score: ${bestBid.bidScore.toFixed(3)}`);
+    console.log(`  Load: ${bestBid.currentLoad.toFixed(2)}`);
+    console.log(`  Time: ${bestBid.estimatedTimeMs}ms`);
 
     if (bestBidSkills && bestBidSkills.size > 0) {
-      console.log(`  Skills:`)
+      console.log(`  Skills:`);
       for (const [skill, score] of bestBidSkills.entries()) {
-        console.log(`    - ${skill}: ${score.toFixed(3)}`)
+        console.log(`    - ${skill}: ${score.toFixed(3)}`);
       }
     }
 
     if ((bestBid as BidWithSkills).isExploration) {
-      console.log(`  Mode: EXPLORATION (agent has no experience)`)
+      console.log(`  Mode: EXPLORATION (agent has no experience)`);
     }
 
     return bestBid.agentId;
@@ -65,7 +65,7 @@ export class SkillBasedNegotiationRouter extends NegotiationRouter {
 
     const bids = status.bids as BidWithSkills[];
     const totalBids = bids.length;
-    const explorationBids = bids.filter(bid => bid.isExploration).length;
+    const explorationBids = bids.filter((bid) => bid.isExploration).length;
 
     return {
       totalBids,

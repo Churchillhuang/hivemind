@@ -4,11 +4,11 @@
  * 根据任务需求创建特定功能的 Agents
  */
 
-import { BaseAgent, type AgentConfig } from '../core/Agent.js';
-import { randomUUID } from 'node:crypto';
-import { Event, EventType } from '../events/Event.js';
-import { EventBus } from '../events/EventBus.js';
-import type { HiveConfig } from '../hive/HiveConfig.js';
+import { randomUUID } from "node:crypto";
+import { BaseAgent } from "../core/Agent.js";
+import { Event, EventType } from "../events/Event.js";
+import { EventBus } from "../events/EventBus.js";
+import type { HiveConfig } from "../hive/HiveConfig.js";
 
 /**
  * AgentTemplate - Agent 模板
@@ -16,13 +16,13 @@ import type { HiveConfig } from '../hive/HiveConfig.js';
 export interface AgentTemplate {
   id: string;
   name: string;
-  type: 'system' | 'functional';
+  type: "system" | "functional";
   role: string;
   description: string;
-  memoryLevel?: 'session' | 'task' | 'knowledge' | 'sample';
+  memoryLevel?: "session" | "task" | "knowledge" | "sample";
   capabilities: string[];
-  lifespan: 'task' | 'session' | 'persistent';
-  model?: string;  // LLM model to use
+  lifespan: "task" | "session" | "persistent";
+  model?: string; // LLM model to use
 }
 
 /**
@@ -44,7 +44,7 @@ export interface AgentRequest {
 export interface AgentInstance extends AgentTemplate {
   instanceId: string;
   createdAt: number;
-  status: 'creating' | 'active' | 'idle' | 'destroying';
+  status: "creating" | "active" | "idle" | "destroying";
   currentTaskId?: string;
   performance: {
     tasksCompleted: number;
@@ -57,22 +57,28 @@ export class AgentFactory extends BaseAgent {
   private hiveConfig: HiveConfig;
   private templates: Map<string, AgentTemplate> = new Map();
   private instances: Map<string, AgentInstance> = new Map();
-  private pendingRequests: Map<string, {
-    resolve: (instance: AgentInstance) => void;
-    reject: (err: Error) => void;
-  }> = new Map();
+  private pendingRequests: Map<
+    string,
+    {
+      resolve: (instance: AgentInstance) => void;
+      reject: (err: Error) => void;
+    }
+  > = new Map();
 
   constructor(
     config: { id: string; role: string; description?: string },
     hiveConfig: HiveConfig,
     eventBus?: EventBus,
   ) {
-    super({
-      id: config.id,
-      role: config.role,
-      type: 'system',
-      description: config.description,
-    }, eventBus);
+    super(
+      {
+        id: config.id,
+        role: config.role,
+        type: "system",
+        description: config.description,
+      },
+      eventBus,
+    );
 
     this.hiveConfig = hiveConfig;
     this.initializeTemplates();
@@ -126,7 +132,7 @@ export class AgentFactory extends BaseAgent {
   }
 
   async handle(event: Event): Promise<void> {
-    if (event.type === EventType.AGENT_CREATE_REQUEST) {
+    if (event.type === "AGENT_CREATE_REQUEST") {
       await this.handleCreateRequest(event);
     }
   }
@@ -136,54 +142,56 @@ export class AgentFactory extends BaseAgent {
    */
   private initializeTemplates(): void {
     // 模板: Moltbook Bot
-    this.templates.set('moltbook_bot', {
-      id: 'moltbook_bot',
-      name: 'Moltbook Bot',
-      type: 'functional',
-      role: 'Moltbook Bot',
-      description: 'Moltbook 社交媒体自动化 - 纯哲学内容',
-      memoryLevel: 'task',
-      capabilities: ['moltbook_api', 'philosophy_generation', 'social_posting'],
-      lifespan: 'session',
+    this.templates.set("moltbook_bot", {
+      id: "moltbook_bot",
+      name: "Moltbook Bot",
+      type: "functional",
+      role: "Moltbook Bot",
+      description: "Moltbook 社交媒体自动化 - 纯哲学内容",
+      memoryLevel: "task",
+      capabilities: ["moltbook_api", "philosophy_generation", "social_posting"],
+      lifespan: "session",
     });
 
     // 模板: WordPress Uploader
-    this.templates.set('wp_uploader', {
-      id: 'wp_uploader',
-      name: 'WordPress Uploader',
-      type: 'functional',
-      role: 'WordPress Uploader',
-      description: 'WordPress 文章上传和管理',
-      memoryLevel: 'task',
-      capabilities: ['wordpress_api', 'html_parsing', 'tagging', 'seo_optimization'],
-      lifespan: 'task',
+    this.templates.set("wp_uploader", {
+      id: "wp_uploader",
+      name: "WordPress Uploader",
+      type: "functional",
+      role: "WordPress Uploader",
+      description: "WordPress 文章上传和管理",
+      memoryLevel: "task",
+      capabilities: ["wordpress_api", "html_parsing", "tagging", "seo_optimization"],
+      lifespan: "task",
     });
 
     // 模板: File Analyzer
-    this.templates.set('file_analyzer', {
-      id: 'file_analyzer',
-      name: 'File Analyzer',
-      type: 'functional',
-      role: 'File Analyzer',
-      description: '文件分析和内容提取',
-      memoryLevel: 'task',
-      capabilities: ['file_reading', 'content_parsing', 'pattern_recognition'],
-      lifespan: 'task',
+    this.templates.set("file_analyzer", {
+      id: "file_analyzer",
+      name: "File Analyzer",
+      type: "functional",
+      role: "File Analyzer",
+      description: "文件分析和内容提取",
+      memoryLevel: "task",
+      capabilities: ["file_reading", "content_parsing", "pattern_recognition"],
+      lifespan: "task",
     });
 
     // 模板: General Assistant
-    this.templates.set('general_assistant', {
-      id: 'general_assistant',
-      name: 'General Assistant',
-      type: 'functional',
-      role: 'General Assistant',
-      description: '通用助手，处理多种任务',
-      memoryLevel: 'session',
-      capabilities: ['text_processing', 'question_answering', 'task_execution'],
-      lifespan: 'session',
+    this.templates.set("general_assistant", {
+      id: "general_assistant",
+      name: "General Assistant",
+      type: "functional",
+      role: "General Assistant",
+      description: "通用助手，处理多种任务",
+      memoryLevel: "session",
+      capabilities: ["text_processing", "question_answering", "task_execution"],
+      lifespan: "session",
     });
 
-    console.log(`[AgentFactory ${this.id}] Templates initialized: ${this.templates.size} templates`);
+    console.log(
+      `[AgentFactory ${this.id}] Templates initialized: ${this.templates.size} templates`,
+    );
   }
 
   /**
@@ -192,7 +200,7 @@ export class AgentFactory extends BaseAgent {
   private async handleCreateRequest(event: Event): Promise<void> {
     const payload = event.payload as AgentRequest & {
       agentId: string;
-      type: 'system' | 'functional';
+      type: "system" | "functional";
       role: string;
       description: string;
     };
@@ -205,16 +213,15 @@ export class AgentFactory extends BaseAgent {
 
       // 通知完成
       await this.eventBus?.publish({
-        type: 'AGENT_CREATED',
+        type: "AGENT_CREATED",
         sourceAgent: this.id,
         payload: {
-          templateId: payload.templateId || 'unknown',
+          templateId: payload.templateId || "unknown",
           instanceId: instance.instanceId,
         },
       });
 
       console.log(`[AgentFactory ${this.id}] Agent created: ${instance.instanceId}`);
-
     } catch (error) {
       console.error(`[AgentFactory ${this.id}] Error creating agent:`, error);
 
@@ -232,13 +239,15 @@ export class AgentFactory extends BaseAgent {
   /**
    * 创建 Agent 实例
    */
-  async createInstance(request: AgentRequest & {
-    agentId?: string;
-    type?: 'system' | 'functional';
-    role?: string;
-    description?: string;
-  }): Promise<AgentInstance> {
-    const templateId = request.templateId || 'general_assistant';
+  async createInstance(
+    request: AgentRequest & {
+      agentId?: string;
+      type?: "system" | "functional";
+      role?: string;
+      description?: string;
+    },
+  ): Promise<AgentInstance> {
+    const templateId = request.templateId || "general_assistant";
     const template = this.templates.get(templateId);
 
     if (!template) {
@@ -246,14 +255,16 @@ export class AgentFactory extends BaseAgent {
     }
 
     // 生成实例 ID
-    const instanceId = request.agentId || `${template.type}_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 6)}`;
+    const instanceId =
+      request.agentId ||
+      `${template.type}_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 6)}`;
 
     // 创建实例
     const instance: AgentInstance = {
       ...template,
       instanceId,
       createdAt: Date.now(),
-      status: 'creating',
+      status: "creating",
       currentTaskId: request.taskId,
       performance: {
         tasksCompleted: 0,
@@ -266,9 +277,9 @@ export class AgentFactory extends BaseAgent {
     this.instances.set(instanceId, instance);
 
     // 模拟创建延迟（实际应该是实例化真正的 Agent 类）
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    instance.status = 'active';
+    instance.status = "active";
 
     // 发布 AGENT_STARTED 事件
     await this.eventBus?.publish({
@@ -297,12 +308,12 @@ export class AgentFactory extends BaseAgent {
       return;
     }
 
-    instance.status = 'destroying';
+    instance.status = "destroying";
 
     // 检查生命周期
-    if (instance.lifespan === 'task' && !instance.currentTaskId) {
+    if (instance.lifespan === "task" && !instance.currentTaskId) {
       // 任务已完成，销毁
-    } else if (instance.lifespan === 'session') {
+    } else if (instance.lifespan === "session") {
       // 会话结束，销毁
     }
 
@@ -342,20 +353,20 @@ export class AgentFactory extends BaseAgent {
    */
   getInstances(filters?: {
     status?: string;
-    type?: 'system' | 'functional';
+    type?: "system" | "functional";
     templateId?: string;
   }): AgentInstance[] {
     let instances = Array.from(this.instances.values());
 
     if (filters) {
       if (filters.status) {
-        instances = instances.filter(i => i.status === filters.status);
+        instances = instances.filter((i) => i.status === filters.status);
       }
       if (filters.type) {
-        instances = instances.filter(i => i.type === filters.type);
+        instances = instances.filter((i) => i.type === filters.type);
       }
       if (filters.templateId) {
-        instances = instances.filter(i => i.id === filters.templateId);
+        instances = instances.filter((i) => i.id === filters.templateId);
       }
     }
 
@@ -384,9 +395,9 @@ export class AgentFactory extends BaseAgent {
     return {
       templates: this.templates.size,
       instances: instances.length,
-      active: instances.filter(i => i.status === 'active').length,
-      idle: instances.filter(i => i.status === 'idle').length,
-      destroying: instances.filter(i => i.status === 'destroying').length,
+      active: instances.filter((i) => i.status === "active").length,
+      idle: instances.filter((i) => i.status === "idle").length,
+      destroying: instances.filter((i) => i.status === "destroying").length,
     };
   }
 
@@ -398,7 +409,7 @@ export class AgentFactory extends BaseAgent {
     let cleaned = 0;
 
     for (const [instanceId, instance] of this.instances.entries()) {
-      if (instance.status === 'idle') {
+      if (instance.status === "idle") {
         const idleTime = now - instance.performance.avgProcessingTime; // Hack: use this field as last active time
         if (idleTime > maxIdleTimeMs) {
           await this.destroyInstance(instanceId);

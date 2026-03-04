@@ -4,7 +4,8 @@
  * 协作分析：事件流分析、协作热力图、涌现指标
  */
 
-import { EmergenceMonitor } from './EmergenceMonitor.js';
+import { EmergenceMonitor } from "./EmergenceMonitor.js";
+import type { InteractionEdge } from "./EmergenceMonitor.js";
 
 /**
  * 协作指标
@@ -15,29 +16,29 @@ export interface CollaborationMetrics {
   mostActiveAgent: string;
   mostCollaborativeAgent: string;
   interactionTypeDistribution: Map<string, number>;
-  collaborationStrength: number;  // 0-1
+  collaborationStrength: number; // 0-1
 }
 
 /**
  * 涌现指标
  */
 export interface EmergenceMetrics {
-  agency: number;  // 0-1 - 自主性
-  coherence: number;  // 0-1 - 连贯性
-  complexity: number;  // 0-1 - 复杂性
-  autonomy: number;  // 0-1 - 自主性
-  selfAwareness: number;  // 0-1 - 自我意识
+  agency: number; // 0-1 - 自主性
+  coherence: number; // 0-1 - 连贯性
+  complexity: number; // 0-1 - 复杂性
+  autonomy: number; // 0-1 - 自主性
+  selfAwareness: number; // 0-1 - 自我意识
 }
 
 /**
  * 事件流分析结果
  */
 export interface EventFlowAnalysis {
-  patterns: string[];  // 识别的模式
-  bottlenecks: string[];  // 瓶颈点
-  deadEnds: string[];  // 死胡同
-  loops: string[];  // 循环
-  emergenceScore: number;  // 0-1
+  patterns: string[]; // 识别的模式
+  bottlenecks: string[]; // 瓶颈点
+  deadEnds: string[]; // 死胡同
+  loops: string[]; // 循环
+  emergenceScore: number; // 0-1
 }
 
 /**
@@ -55,7 +56,6 @@ export class CollaborationAnalyzer {
    */
   analyzeCollaboration(): CollaborationMetrics {
     const graph = this.emergenceMonitor.getInteractionGraph();
-    const traces = this.emergenceMonitor.getEventTraces();
 
     const totalInteractions = graph.edges.length;
     const agents = graph.nodes;
@@ -67,8 +67,8 @@ export class CollaborationAnalyzer {
       interactionCount.set(edge.from, (interactionCount.get(edge.from) || 0) + edge.weight);
       interactionCount.set(edge.to, (interactionCount.get(edge.to) || 0) + edge.weight);
     }
-    const mostActiveAgent = Array.from(interactionCount.entries())
-      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'none';
+    const mostActiveAgent =
+      Array.from(interactionCount.entries()).toSorted((a, b) => b[1] - a[1])[0]?.[0] || "none";
 
     // 最协作的 agent（与最多不同的 agents 交互）
     const collaborationMap = new Map<string, Set<string>>();
@@ -83,8 +83,9 @@ export class CollaborationAnalyzer {
       }
       collaborationMap.get(edge.to)!.add(edge.from);
     }
-    const mostCollaborativeAgent = Array.from(collaborationMap.entries())
-      .sort((a, b) => b[1].size - a[1].size)[0]?.[0] || 'none';
+    const mostCollaborativeAgent =
+      Array.from(collaborationMap.entries()).toSorted((a, b) => b[1].size - a[1].size)[0]?.[0] ||
+      "none";
 
     // 交互类型分布
     const typeDistribution = new Map<string, number>();
@@ -139,7 +140,8 @@ export class CollaborationAnalyzer {
       nodeLoad.set(edge.to, (nodeLoad.get(edge.to) || 0) + edge.weight);
     }
 
-    const avgLoad = Array.from(nodeLoad.values()).reduce((sum, val) => sum + val, 0) / nodeLoad.size;
+    const avgLoad =
+      Array.from(nodeLoad.values()).reduce((sum, val) => sum + val, 0) / nodeLoad.size;
     for (const [node, load] of nodeLoad.entries()) {
       if (load > avgLoad * 3) {
         bottlenecks.push(`Bottleneck: ${node} (${load} interactions)`);
@@ -167,13 +169,17 @@ export class CollaborationAnalyzer {
         visited.add(edge.from);
         const path = this.findPath(edge.from, edge.to, graph.edges, new Set([edge.from]));
         if (path && path.length > 3) {
-          loops.push(`Loop: ${path.join(' -> ')}`);
+          loops.push(`Loop: ${path.join(" -> ")}`);
         }
       }
     }
 
     // 计算涌现分数
-    const emergenceScore = this.calculateEmergenceScore(patterns.length, loops.length, bottlenecks.length);
+    const emergenceScore = this.calculateEmergenceScore(
+      patterns.length,
+      loops.length,
+      bottlenecks.length,
+    );
 
     return {
       patterns,
@@ -187,7 +193,12 @@ export class CollaborationAnalyzer {
   /**
    * 查找路径
    */
-  private findPath(from: string, to: string, edges: any[], visited: Set<string>): string[] | null {
+  private findPath(
+    from: string,
+    to: string,
+    edges: InteractionEdge[],
+    visited: Set<string>,
+  ): string[] | null {
     const stack: { node: string; path: string[] }[] = [{ node: from, path: [from] }];
 
     while (stack.length > 0) {
@@ -216,7 +227,7 @@ export class CollaborationAnalyzer {
   private calculateEmergenceScore(patterns: number, loops: number, bottlenecks: number): number {
     const complexity = Math.min(1, (patterns + loops) / 20);
     const efficiency = Math.max(0, 1 - bottlenecks / 10);
-    return (complexity * 0.6 + efficiency * 0.4);
+    return complexity * 0.6 + efficiency * 0.4;
   }
 
   /**
@@ -227,8 +238,8 @@ export class CollaborationAnalyzer {
     const flow = this.analyzeEventFlow();
 
     // Agency: 自主性 - 基于协作强度和交互类型多样性
-    const typeDiversity = collaboration.interactionTypeDistribution.size / 4;  // 假设最多 4 种类型
-    const agency = (collaboration.collaborationStrength * 0.6 + typeDiversity * 0.4);
+    const typeDiversity = collaboration.interactionTypeDistribution.size / 4; // 假设最多 4 种类型
+    const agency = collaboration.collaborationStrength * 0.6 + typeDiversity * 0.4;
 
     // Coherence: 连贯性 - 基于模式一致性
     const coherence = Math.min(1, flow.patterns.length / 10);

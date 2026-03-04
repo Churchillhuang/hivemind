@@ -4,9 +4,8 @@
  * 涌现监控：事件追踪、状态可视化、交互图谱、实时监控
  */
 
-import { getGlobalEventBus } from '../events/EventBus.js';
-import type { Event } from '../events/Event.js';
-import type { BaseAgent } from '../core/Agent.js';
+import type { Event } from "../events/Event.js";
+import { getGlobalEventBus } from "../events/EventBus.js";
 
 /**
  * 事件追踪记录
@@ -38,7 +37,7 @@ export interface StateSnapshot {
 export interface InteractionEdge {
   from: string;
   to: string;
-  type: 'message' | 'task' | 'notification' | 'sync';
+  type: "message" | "task" | "notification" | "sync";
   weight: number;
   timestamp: number;
 }
@@ -59,8 +58,8 @@ export interface MonitoringData {
   timestamp: number;
   activeAgents: number;
   pendingTasks: number;
-  systemLoad: number;  // 0-1
-  eventRate: number;  // events/sec
+  systemLoad: number; // 0-1
+  eventRate: number; // events/sec
   anomalyCount: number;
 }
 
@@ -88,7 +87,7 @@ export class EmergenceMonitor {
 
   // 实时监控
   private monitoringData: MonitoringData[] = [];
-  private monitoringInterval = 5000;  // 5 秒
+  private monitoringInterval = 5000; // 5 秒
   private monitoringTimer?: NodeJS.Timeout;
 
   // 活跃 agents
@@ -110,10 +109,10 @@ export class EmergenceMonitor {
    */
   private setupEventListeners(): void {
     // 监听所有事件
-    const unsubscribe = this.eventBus.subscribe('*', this.handleEvent.bind(this));
-    this.subscriptions.push({ event: '*', unsubscribe });
+    const unsubscribe = this.eventBus.subscribe("*", this.handleEvent.bind(this));
+    this.subscriptions.push({ event: "*", unsubscribe });
 
-    console.log('[Emergence] Emergence monitor started');
+    console.log("[Emergence] Emergence monitor started");
   }
 
   /**
@@ -127,7 +126,7 @@ export class EmergenceMonitor {
       id: `${event.id}_trace`,
       timestamp: event.timestamp,
       type: event.type,
-      sourceAgentId: event.agentId || 'system',
+      sourceAgentId: event.agentId || "system",
       targetAgentId: this.extractTargetAgent(event),
       payload: event.payload,
       correlationId: event.correlationId,
@@ -161,23 +160,23 @@ export class EmergenceMonitor {
    * 更新交互图谱
    */
   private updateInteractionGraph(event: Event): void {
-    const source = event.agentId || 'system';
+    const source = event.agentId || "system";
     const target = this.extractTargetAgent(event);
 
     if (target && target !== source) {
       // 确定交互类型
-      let type: InteractionEdge['type'] = 'message';
-      if (event.type.includes('task')) {
-        type = 'task';
-      } else if (event.type.includes('notification')) {
-        type = 'notification';
-      } else if (event.type.includes('sync')) {
-        type = 'sync';
+      let type: InteractionEdge["type"] = "message";
+      if (event.type.includes("task")) {
+        type = "task";
+      } else if (event.type.includes("notification")) {
+        type = "notification";
+      } else if (event.type.includes("sync")) {
+        type = "sync";
       }
 
       // 查找现有边
       const existingEdge = this.interactionEdges.find(
-        e => e.from === source && e.to === target && e.type === type,
+        (e) => e.from === source && e.to === target && e.type === type,
       );
 
       if (existingEdge) {
@@ -210,7 +209,12 @@ export class EmergenceMonitor {
   /**
    * 记录状态快照
    */
-  recordStateSnapshot(agentId: string, state: string, properties: Record<string, unknown>, metadata?: Record<string, unknown>): void {
+  recordStateSnapshot(
+    agentId: string,
+    state: string,
+    properties: Record<string, unknown>,
+    metadata?: Record<string, unknown>,
+  ): void {
     const snapshot: StateSnapshot = {
       timestamp: Date.now(),
       agentId,
@@ -237,13 +241,13 @@ export class EmergenceMonitor {
    */
   startMonitoring(): void {
     if (this.monitoringTimer) {
-      console.log('[Emergence] Monitoring already started');
+      console.log("[Emergence] Monitoring already started");
       return;
     }
 
     this.monitoringTimer = setInterval(() => this.collectMonitoringData(), this.monitoringInterval);
 
-    console.log('[Emergence] Real-time monitoring started');
+    console.log("[Emergence] Real-time monitoring started");
   }
 
   /**
@@ -255,7 +259,7 @@ export class EmergenceMonitor {
       this.monitoringTimer = undefined;
     }
 
-    console.log('[Emergence] Real-time monitoring stopped');
+    console.log("[Emergence] Real-time monitoring stopped");
   }
 
   /**
@@ -265,19 +269,22 @@ export class EmergenceMonitor {
     const now = Date.now();
 
     // 计算事件速率
-    const timeSpan = (now - this.eventCountStart) / 1000;  // 秒
+    const timeSpan = (now - this.eventCountStart) / 1000; // 秒
     const eventRate = this.eventCount / timeSpan;
 
     // 估算系统负载（简化）
-    const systemLoad = Math.min(1, this.activeAgents.size / 10 + this.interactionEdges.length / 100);
+    const systemLoad = Math.min(
+      1,
+      this.activeAgents.size / 10 + this.interactionEdges.length / 100,
+    );
 
     const data: MonitoringData = {
       timestamp: now,
       activeAgents: this.activeAgents.size,
-      pendingTasks: this.eventTraces.filter(t => t.type.includes('task')).length,
+      pendingTasks: this.eventTraces.filter((t) => t.type.includes("task")).length,
       systemLoad,
       eventRate,
-      anomalyCount: 0,  // 将从 MetricsTracker 获取
+      anomalyCount: 0, // 将从 MetricsTracker 获取
     };
 
     this.monitoringData.push(data);
@@ -287,7 +294,9 @@ export class EmergenceMonitor {
       this.monitoringData.shift();
     }
 
-    console.log(`[Emergence] Monitoring: ${data.activeAgents} agents, ${data.pendingTasks} tasks, load: ${(data.systemLoad * 100).toFixed(0)}%`);
+    console.log(
+      `[Emergence] Monitoring: ${data.activeAgents} agents, ${data.pendingTasks} tasks, load: ${(data.systemLoad * 100).toFixed(0)}%`,
+    );
   }
 
   /**
@@ -297,16 +306,15 @@ export class EmergenceMonitor {
     let traces = [...this.eventTraces];
 
     if (agentId) {
-      traces = traces.filter(t => t.sourceAgentId === agentId || t.targetAgentId === agentId);
+      traces = traces.filter((t) => t.sourceAgentId === agentId || t.targetAgentId === agentId);
     }
 
     if (since) {
-      traces = traces.filter(t => t.timestamp >= since);
+      traces = traces.filter((t) => t.timestamp >= since);
     }
 
-    traces.reverse();  // 最新的在前
-
-    return limit ? traces.slice(0, limit) : traces;
+    const ordered = traces.toReversed(); // 最新的在前
+    return limit ? ordered.slice(0, limit) : ordered;
   }
 
   /**
@@ -315,8 +323,8 @@ export class EmergenceMonitor {
   getStateSnapshots(agentId?: string, since?: number): StateSnapshot[] {
     if (agentId) {
       const snapshots = this.stateSnapshots.get(agentId) || [];
-      const filtered = since ? snapshots.filter(s => s.timestamp >= since) : snapshots;
-      return filtered.slice().reverse();
+      const filtered = since ? snapshots.filter((s) => s.timestamp >= since) : snapshots;
+      return filtered.toReversed();
     }
 
     // 返回所有 agent 的快照，反转时间顺序
@@ -324,8 +332,8 @@ export class EmergenceMonitor {
     for (const snapshots of this.stateSnapshots.values()) {
       allSnapshots.push(...snapshots);
     }
-    const filtered = since ? allSnapshots.filter(s => s.timestamp >= since) : allSnapshots;
-    return filtered.sort((a, b) => b.timestamp - a.timestamp);
+    const filtered = since ? allSnapshots.filter((s) => s.timestamp >= since) : allSnapshots;
+    return filtered.toSorted((a, b) => b.timestamp - a.timestamp);
   }
 
   /**
@@ -335,7 +343,7 @@ export class EmergenceMonitor {
     let edges = [...this.interactionEdges];
 
     if (since) {
-      edges = edges.filter(e => e.timestamp >= since);
+      edges = edges.filter((e) => e.timestamp >= since);
     }
 
     // 重建节点列表
@@ -359,7 +367,7 @@ export class EmergenceMonitor {
     let data = [...this.monitoringData];
 
     if (since) {
-      data = data.filter(d => d.timestamp >= since);
+      data = data.filter((d) => d.timestamp >= since);
     }
 
     return data;
@@ -368,7 +376,10 @@ export class EmergenceMonitor {
   /**
    * 生成事件流可视化（JSON 格式）
    */
-  generateEventFlowVisualization(agentId?: string, since?: number): {
+  generateEventFlowVisualization(
+    agentId?: string,
+    since?: number,
+  ): {
     nodes: Array<{ id: string; type: string }>;
     edges: Array<{ from: string; to: string; type: string; weight: number }>;
     timeline: Array<{ time: number; type: string; from: string; to?: string }>;
@@ -381,10 +392,10 @@ export class EmergenceMonitor {
     for (const trace of traces) {
       // 处理节点
       if (!nodes.has(trace.sourceAgentId)) {
-        nodes.set(trace.sourceAgentId, { id: trace.sourceAgentId, type: 'source' });
+        nodes.set(trace.sourceAgentId, { id: trace.sourceAgentId, type: "source" });
       }
       if (trace.targetAgentId && !nodes.has(trace.targetAgentId)) {
-        nodes.set(trace.targetAgentId, { id: trace.targetAgentId, type: 'target' });
+        nodes.set(trace.targetAgentId, { id: trace.targetAgentId, type: "target" });
       }
 
       // 处理边
@@ -438,7 +449,7 @@ export class EmergenceMonitor {
     // 收集所有状态
     const states = new Set<string>();
     for (const transition of stateTransitions.keys()) {
-      const [from, to] = transition.split('->');
+      const [from, to] = transition.split("->");
       states.add(from);
       states.add(to);
     }
@@ -458,7 +469,7 @@ export class EmergenceMonitor {
     // 生成边
     const edges: Array<{ from: string; to: string; weight: number }> = [];
     for (const [transition, weight] of stateTransitions.entries()) {
-      const [from, to] = transition.split('->');
+      const [from, to] = transition.split("->");
       edges.push({ from, to, weight });
     }
 
@@ -477,7 +488,7 @@ export class EmergenceMonitor {
 
     // 初始化矩阵
     for (let i = 0; i < agents.length; i++) {
-      matrix[i] = new Array(agents.length).fill(0);
+      matrix[i] = Array.from({ length: agents.length }, () => 0);
     }
 
     // 填充矩阵
@@ -526,6 +537,6 @@ export class EmergenceMonitor {
     }
     this.subscriptions = [];
 
-    console.log('[Emergence] Emergence monitor reset');
+    console.log("[Emergence] Emergence monitor reset");
   }
 }

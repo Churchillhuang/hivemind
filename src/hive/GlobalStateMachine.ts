@@ -4,21 +4,21 @@
  * 支持状态模式、检查点、持久化、回滚
  */
 
-import { promises as fs } from 'fs';
-import { randomUUID } from 'node:crypto';
-import path from 'path';
-import type { HiveConfig } from './HiveConfig.js';
+import { promises as fs } from "fs";
+import { randomUUID } from "node:crypto";
+import path from "path";
+import type { HiveConfig } from "./HiveConfig.js";
 
 /**
  * 状态类型
  */
 export type StateMachineState =
-  | 'idle'
-  | 'processing'
-  | 'blocked'
-  | 'recovery'
-  | 'shutdown'
-  | 'error';
+  | "idle"
+  | "processing"
+  | "blocked"
+  | "recovery"
+  | "shutdown"
+  | "error";
 
 /**
  * 状态转换
@@ -39,14 +39,14 @@ export interface Checkpoint {
   id: string;
   timestamp: number;
   state: StateMachineState;
-  stateHash: string;  // 状态数据的哈希
-  checksum: string;   // 校验和
+  stateHash: string; // 状态数据的哈希
+  checksum: string; // 校验和
   metadata: {
     activeAgents: string[];
     pendingTasks: number;
     completedTasks: number;
     eventHistorySize: number;
-    generation: number;  // 状态代数（用于回滚）
+    generation: number; // 状态代数（用于回滚）
   };
   snapshots: {
     agents: string;
@@ -105,11 +105,11 @@ export class GlobalStateMachine {
   constructor(config: StateMachineConfig, hiveConfig: HiveConfig) {
     this.config = {
       enablePersistence: true,
-      checkpointPath: '/root/.openclaw/.hivemind/state',
+      checkpointPath: "/root/.openclaw/.hivemind/state",
       maxCheckpoints: 10,
       checkpointInterval: 60000, // 1 分钟
       enableRollback: true,
-      stateVersion: '1.0.0',
+      stateVersion: "1.0.0",
       ...config,
     };
 
@@ -122,9 +122,9 @@ export class GlobalStateMachine {
    */
   private initializeState(): GlobalState {
     return {
-      version: this.config.stateVersion || '1.0.0',
+      version: this.config.stateVersion || "1.0.0",
       generation: 0,
-      currentState: 'idle',
+      currentState: "idle",
       metadata: {
         activeAgents: [],
         pendingTasks: 0,
@@ -154,7 +154,9 @@ export class GlobalStateMachine {
     // 启动检查点定时器
     this.startCheckpointSchedule();
 
-    console.log(`[GSM] Started (state: ${this.state.currentState}, generation: ${this.state.generation})`);
+    console.log(
+      `[GSM] Started (state: ${this.state.currentState}, generation: ${this.state.generation})`,
+    );
   }
 
   /**
@@ -169,7 +171,7 @@ export class GlobalStateMachine {
 
     // 保存最终状态
     if (this.config.enablePersistence) {
-      await this.saveState(true);  // final save
+      await this.saveState(true); // final save
     }
 
     console.log(`[GSM] Stopped`);
@@ -178,7 +180,12 @@ export class GlobalStateMachine {
   /**
    * 状态转换
    */
-  async transition(to: StateMachineState, reason: string, agentId?: string, metadata?: Record<string, unknown>): Promise<void> {
+  async transition(
+    to: StateMachineState,
+    reason: string,
+    agentId?: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
     const from = this.state.currentState;
 
     // 验证转换是否合法
@@ -205,7 +212,7 @@ export class GlobalStateMachine {
     console.log(`[GSM] State transition: ${from} -> ${to} (${reason})`);
 
     // 自动检查点（重要状态转换）
-    if (to === 'processing' || to === 'error' || to === 'shutdown') {
+    if (to === "processing" || to === "error" || to === "shutdown") {
       await this.createCheckpoint(`transition_${to}`);
     }
   }
@@ -222,12 +229,12 @@ export class GlobalStateMachine {
 
     // 状态转换矩阵
     const allowed: Record<StateMachineState, StateMachineState[]> = {
-      idle: ['processing', 'shutdown', 'error'],
-      processing: ['idle', 'blocked', 'error', 'shutdown'],
-      blocked: ['idle', 'error', 'shutdown'],
-      recovery: ['idle', 'processing', 'error', 'shutdown'],
-      shutdown: ['idle', 'error'],
-      error: ['recovery', 'shutdown', 'idle'],
+      idle: ["processing", "shutdown", "error"],
+      processing: ["idle", "blocked", "error", "shutdown"],
+      blocked: ["idle", "error", "shutdown"],
+      recovery: ["idle", "processing", "error", "shutdown"],
+      shutdown: ["idle", "error"],
+      error: ["recovery", "shutdown", "idle"],
     };
 
     return allowed[from]?.includes(to) || false;
@@ -236,7 +243,7 @@ export class GlobalStateMachine {
   /**
    * 更新元数据
    */
-  updateMetadata(updates: Partial<GlobalState['metadata']>): void {
+  updateMetadata(updates: Partial<GlobalState["metadata"]>): void {
     this.state.metadata = {
       ...this.state.metadata,
       ...updates,
@@ -248,7 +255,7 @@ export class GlobalStateMachine {
    * 创建检查点
    */
   async createCheckpoint(_reason?: string): Promise<Checkpoint> {
-    const checkpointId = `ckpt_${Date.now()}_${randomUUID().replaceAll('-', '').slice(0, 9)}`;
+    const checkpointId = `ckpt_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`;
 
     // 生成快照
     const stateString = JSON.stringify(this.state);
@@ -264,7 +271,7 @@ export class GlobalStateMachine {
         activeAgents: [...this.state.metadata.activeAgents],
         pendingTasks: this.state.metadata.pendingTasks,
         completedTasks: this.state.metadata.completedTasks,
-        eventHistorySize: 0,  // TODO: 从 EventBus 获取
+        eventHistorySize: 0, // TODO: 从 EventBus 获取
         generation: this.state.generation,
       },
       snapshots: {
@@ -274,7 +281,7 @@ export class GlobalStateMachine {
           completed: this.state.metadata.completedTasks,
           failed: this.state.metadata.failedTasks,
         }),
-        events: '',  // TODO: 从 EventBus 获取
+        events: "", // TODO: 从 EventBus 获取
       },
     };
 
@@ -299,7 +306,7 @@ export class GlobalStateMachine {
    */
   async rollback(checkpointId: string): Promise<void> {
     if (!this.config.enableRollback) {
-      throw new Error('Rollback is disabled');
+      throw new Error("Rollback is disabled");
     }
 
     const checkpoint = this.checkpoints.get(checkpointId);
@@ -320,7 +327,7 @@ export class GlobalStateMachine {
 
     // 增加代数标记为回滚
     const rollbackTransition: StateTransition = {
-      from: this.state.lastTransition?.to || 'idle',
+      from: this.state.lastTransition?.to || "idle",
       to: checkpoint.state,
       timestamp: Date.now(),
       reason: `rollback to ${checkpointId}`,
@@ -371,7 +378,7 @@ export class GlobalStateMachine {
     let hash = 0;
     for (let i = 0; i < data.length; i++) {
       const char = data.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
     }
     return Math.abs(hash).toString(36);
   }
@@ -395,7 +402,7 @@ export class GlobalStateMachine {
     const interval = this.config.checkpointInterval || 60000;
 
     this.checkpointTimer = setInterval(async () => {
-      await this.createCheckpoint('scheduled');
+      await this.createCheckpoint("scheduled");
     }, interval);
 
     console.log(`[GSM] Checkpoint schedule started (interval: ${interval}ms)`);
@@ -432,10 +439,13 @@ export class GlobalStateMachine {
       return;
     }
 
-    const statePath = path.join(this.config.checkpointPath, final ? 'final_state.json' : 'current_state.json');
+    const statePath = path.join(
+      this.config.checkpointPath,
+      final ? "final_state.json" : "current_state.json",
+    );
 
     await fs.mkdir(this.config.checkpointPath, { recursive: true });
-    await fs.writeFile(statePath, JSON.stringify(this.state, null, 2), 'utf-8');
+    await fs.writeFile(statePath, JSON.stringify(this.state, null, 2), "utf-8");
 
     if (final) {
       console.log(`[GSM] Final state saved to: ${statePath}`);
@@ -450,15 +460,17 @@ export class GlobalStateMachine {
       return;
     }
 
-    const statePath = path.join(this.config.checkpointPath, 'current_state.json');
+    const statePath = path.join(this.config.checkpointPath, "current_state.json");
 
     try {
-      const content = await fs.readFile(statePath, 'utf-8');
+      const content = await fs.readFile(statePath, "utf-8");
       const loadedState = JSON.parse(content);
 
       // 验证版本兼容性
       if (loadedState.version !== this.config.stateVersion) {
-        console.warn(`[GSM] State version mismatch: loaded=${loadedState.version}, current=${this.config.stateVersion}`);
+        console.warn(
+          `[GSM] State version mismatch: loaded=${loadedState.version}, current=${this.config.stateVersion}`,
+        );
       }
 
       this.state = loadedState;
@@ -467,7 +479,7 @@ export class GlobalStateMachine {
       await this.loadCheckpoints();
 
       console.log(`[GSM] State loaded from: ${statePath} (generation: ${this.state.generation})`);
-    } catch (_error) {
+    } catch {
       console.log(`[GSM] Failed to load state, using initial state`);
     }
   }
@@ -480,10 +492,13 @@ export class GlobalStateMachine {
       return;
     }
 
-    const checkpointPath = path.join(this.config.checkpointPath, `checkpoint_${checkpoint.id}.json`);
+    const checkpointPath = path.join(
+      this.config.checkpointPath,
+      `checkpoint_${checkpoint.id}.json`,
+    );
 
     await fs.mkdir(this.config.checkpointPath, { recursive: true });
-    await fs.writeFile(checkpointPath, JSON.stringify(checkpoint, null, 2), 'utf-8');
+    await fs.writeFile(checkpointPath, JSON.stringify(checkpoint, null, 2), "utf-8");
   }
 
   /**
@@ -496,18 +511,20 @@ export class GlobalStateMachine {
 
     try {
       const files = await fs.readdir(this.config.checkpointPath);
-      const checkpointFiles = files.filter(f => f.startsWith('checkpoint_') && f.endsWith('.json'));
+      const checkpointFiles = files.filter(
+        (f) => f.startsWith("checkpoint_") && f.endsWith(".json"),
+      );
 
       for (const file of checkpointFiles) {
         const filePath = path.join(this.config.checkpointPath, file);
-        const content = await fs.readFile(filePath, 'utf-8');
+        const content = await fs.readFile(filePath, "utf-8");
         const checkpoint = JSON.parse(content);
 
         this.checkpoints.set(checkpoint.id, checkpoint);
       }
 
       console.log(`[GSM] Loaded ${this.checkpoints.size} checkpoints`);
-    } catch (_error) {
+    } catch {
       console.log(`[GSM] Failed to load checkpoints`);
     }
   }
@@ -524,7 +541,7 @@ export class GlobalStateMachine {
 
     try {
       await fs.unlink(checkpointPath);
-    } catch (_error) {
+    } catch {
       console.error(`[GSM] Failed to delete checkpoint file: ${checkpointPath}`);
     }
   }

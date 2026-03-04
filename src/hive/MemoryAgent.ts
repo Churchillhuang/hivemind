@@ -4,12 +4,12 @@
  * 负责按需检索和分发记忆，实现分层记忆系统
  */
 
-import { BaseAgent } from '../core/Agent.js';
-import { Event, EventType } from '../events/Event.js';
-import { EventBus } from '../events/EventBus.js';
-import type { HiveConfig, MemoryLevel } from '../hive/HiveConfig.js';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { promises as fs } from "fs";
+import path from "path";
+import { BaseAgent } from "../core/Agent.js";
+import { Event, EventType } from "../events/Event.js";
+import { EventBus } from "../events/EventBus.js";
+import type { HiveConfig, MemoryLevel } from "../hive/HiveConfig.js";
 
 export interface MemoryQuery {
   query: string;
@@ -36,8 +36,8 @@ export interface MemoryIndexEntry {
   path: string;
   lastModified: number;
   size: number;
-  summary?: string;          // 简短摘要（可选）
-  level?: MemoryLevel;       // 记忆层级
+  summary?: string; // 简短摘要（可选）
+  level?: MemoryLevel; // 记忆层级
 }
 
 export class MemoryAgent extends BaseAgent {
@@ -51,12 +51,15 @@ export class MemoryAgent extends BaseAgent {
     hiveConfig: HiveConfig,
     eventBus?: EventBus,
   ) {
-    super({
-      id: config.id,
-      role: config.role,
-      type: 'system',
-      description: config.description,
-    }, eventBus);
+    super(
+      {
+        id: config.id,
+        role: config.role,
+        type: "system",
+        description: config.description,
+      },
+      eventBus,
+    );
 
     this.hiveConfig = hiveConfig;
 
@@ -103,7 +106,7 @@ export class MemoryAgent extends BaseAgent {
   }
 
   async handle(event: Event): Promise<void> {
-    if (event.type === EventType.MEMORY_QUERY) {
+    if (event.type === "MEMORY_QUERY") {
       await this.handleMemoryQuery(event);
     }
   }
@@ -114,27 +117,27 @@ export class MemoryAgent extends BaseAgent {
   private async buildMemoryIndex(): Promise<void> {
     console.log(`[MemoryAgent ${this.id}] Building memory index...`);
 
-    const memoryPath = this.hiveConfig.memory?.indexing.memoryPath || '';
-    const workspacePath = this.hiveConfig.memory?.indexing.workspacePath || '';
+    const memoryPath = this.hiveConfig.memory?.indexing.memoryPath || "";
+    const workspacePath = this.hiveConfig.memory?.indexing.workspacePath || "";
 
     try {
       // 索引 MEMORY.md
-      const memoryPathFull = path.join(workspacePath, 'MEMORY.md');
+      const memoryPathFull = path.join(workspacePath, "MEMORY.md");
       if (await this.fileExists(memoryPathFull)) {
         const stats = await fs.stat(memoryPathFull);
-        this.memoryIndex.set('MEMORY.md', {
+        this.memoryIndex.set("MEMORY.md", {
           path: memoryPathFull,
           lastModified: stats.mtime.getTime(),
           size: stats.size,
-          level: 'knowledge',
-          summary: 'Long-term memory',
+          level: "knowledge",
+          summary: "Long-term memory",
         });
       }
 
       // 索引 daily memory files
       if (await this.directoryExists(memoryPath)) {
         const files = await fs.readdir(memoryPath);
-        const memoryFiles = files.filter(f => f.match(/^\d{4}-\d{2}-\d{2}\.md$/));
+        const memoryFiles = files.filter((f) => f.match(/^\d{4}-\d{2}-\d{2}\.md$/));
 
         for (const file of memoryFiles) {
           const filePath = path.join(memoryPath, file);
@@ -155,7 +158,6 @@ export class MemoryAgent extends BaseAgent {
 
       console.log(`[MemoryAgent ${this.id}] Index built: ${this.memoryIndex.size} entries`);
       this.lastIndexUpdate = Date.now();
-
     } catch (error) {
       console.error(`[MemoryAgent ${this.id}] Error building memory index:`, error);
     }
@@ -173,11 +175,11 @@ export class MemoryAgent extends BaseAgent {
 
     // 判断层级
     if (retention && daysOld <= retention.sessionDays) {
-      return 'session';
+      return "session";
     } else if (retention && daysOld <= retention.sampleDays) {
-      return 'sample';
+      return "sample";
     } else {
-      return 'knowledge';
+      return "knowledge";
     }
   }
 
@@ -191,7 +193,7 @@ export class MemoryAgent extends BaseAgent {
 
     try {
       // 确定查询层级
-      const level: MemoryLevel = query.options?.level || 'knowledge';
+      const level: MemoryLevel = query.options?.level || "knowledge";
 
       // 检索记忆
       const results = await this.retrieveMemory(query.query, level, query.options?.limit);
@@ -207,7 +209,6 @@ export class MemoryAgent extends BaseAgent {
       });
 
       console.log(`[MemoryAgent ${this.id}] Query completed: ${results.length} results`);
-
     } catch (error) {
       console.error(`[MemoryAgent ${this.id}] Error processing query:`, error);
 
@@ -229,9 +230,9 @@ export class MemoryAgent extends BaseAgent {
     query: string,
     level: MemoryLevel,
     limit?: number,
-  ): Promise<MemoryResult['data']> {
+  ): Promise<MemoryResult["data"]> {
     const maxResults = limit || 10;
-    const results: MemoryResult['data'] = [];
+    const results: MemoryResult["data"] = [];
 
     // 定期更新索引
     if (Date.now() - this.lastIndexUpdate > this.INDEX_UPDATE_INTERVAL) {
@@ -239,8 +240,9 @@ export class MemoryAgent extends BaseAgent {
     }
 
     // 筛选符合层级的记忆
-    const filtered = Array.from(this.memoryIndex.values())
-      .filter(entry => !entry.level || this.levelMatches(entry.level, level));
+    const filtered = Array.from(this.memoryIndex.values()).filter(
+      (entry) => !entry.level || this.levelMatches(entry.level, level),
+    );
 
     // MVP: 简单的关键词匹配
     // 后期可以加入向量搜索或语义搜索
@@ -252,24 +254,24 @@ export class MemoryAgent extends BaseAgent {
       }
 
       try {
-        const content = await fs.readFile(entry.path, 'utf-8');
-        const lines = content.split('\n');
+        const content = await fs.readFile(entry.path, "utf-8");
+        const lines = content.split("\n");
 
         // 简单的关键词匹配
         const matchingLines = lines.filter((line, index) => {
-          return line.toLowerCase().includes(queryLower) ||
-                 this.isHeadingLine(line, lines, index, query);
+          return (
+            line.toLowerCase().includes(queryLower) || this.isHeadingLine(line, lines, index, query)
+          );
         });
 
         if (matchingLines.length > 0) {
           results.push({
-            level: entry.level || 'knowledge',
-            content: matchingLines.slice(0, 5).join('\n'),  // 最多 5 行
+            level: entry.level || "knowledge",
+            content: matchingLines.slice(0, 5).join("\n"), // 最多 5 行
             source: entry.path,
             timestamp: entry.lastModified,
           });
         }
-
       } catch (error) {
         console.error(`[MemoryAgent ${this.id}] Error reading ${entry.path}:`, error);
       }
@@ -289,12 +291,12 @@ export class MemoryAgent extends BaseAgent {
     // session 只匹配 session
     // none 不匹配任何东西
 
-    if (queryLevel === 'knowledge') {
+    if (queryLevel === "knowledge") {
       return true;
     }
 
-    if (queryLevel === 'sample') {
-      return entryLevel === 'sample' || entryLevel === 'session';
+    if (queryLevel === "sample") {
+      return entryLevel === "sample" || entryLevel === "session";
     }
 
     return entryLevel === queryLevel;
@@ -303,12 +305,7 @@ export class MemoryAgent extends BaseAgent {
   /**
    * 判断是否是标题行或相关上下文
    */
-  private isHeadingLine(
-    line: string,
-    lines: string[],
-    index: number,
-    query: string,
-  ): boolean {
+  private isHeadingLine(line: string, lines: string[], index: number, query: string): boolean {
     // 简单的 Markdown 标题检测
     if (line.match(/^#{1,6}\s/)) {
       return line.toLowerCase().includes(query.toLowerCase());

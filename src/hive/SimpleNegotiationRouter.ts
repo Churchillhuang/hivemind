@@ -11,9 +11,9 @@
  *   现在：Agent 直接返回愿意程度 (0-1)
  */
 
-import type { Event } from '../events/Event.js';
-import { EventBus } from '../events/EventBus.js';
-import type { HiveConfig } from './HiveConfig.js';
+import type { Event } from "../events/Event.js";
+import { EventBus } from "../events/EventBus.js";
+import type { HiveConfig } from "./HiveConfig.js";
 
 export interface SimpleTaskAnnouncement {
   taskId: string;
@@ -24,19 +24,22 @@ export interface SimpleTaskAnnouncement {
 
 export interface SimpleBid {
   agentId: string;
-  willing: number;  // 愿意程度 (0-1)
+  willing: number; // 愿意程度 (0-1)
   timestamp: number;
 }
 
 export class SimpleNegotiationRouter {
   private config: HiveConfig;
   private eventBus: EventBus;
-  private activeNegotiations: Map<string, {
-    announcement: SimpleTaskAnnouncement;
-    bids: SimpleBid[];
-    startTime: number;
-    deadline: number;
-  }>;
+  private activeNegotiations: Map<
+    string,
+    {
+      announcement: SimpleTaskAnnouncement;
+      bids: SimpleBid[];
+      startTime: number;
+      deadline: number;
+    }
+  >;
   private running: boolean = false;
 
   constructor(config: HiveConfig, eventBus: EventBus) {
@@ -45,7 +48,7 @@ export class SimpleNegotiationRouter {
     this.activeNegotiations = new Map();
 
     // 订阅 bid 事件
-    this.eventBus.subscribe('SIMPLE_BID', this.handleBid.bind(this));
+    this.eventBus.subscribe("SIMPLE_BID", this.handleBid.bind(this));
   }
 
   /**
@@ -68,8 +71,8 @@ export class SimpleNegotiationRouter {
     this.activeNegotiations.set(task.taskId, negotiation);
 
     // 广播任务公告
-    this.eventBus.publish({
-      type: 'SIMPLE_TASK_ANNOUNCEMENT',
+    void this.eventBus.publish({
+      type: "SIMPLE_TASK_ANNOUNCEMENT",
       payload: task,
       timestamp: Date.now(),
     });
@@ -77,7 +80,7 @@ export class SimpleNegotiationRouter {
     console.log(`[SimpleRouter] Task announced: ${task.taskId} (${task.taskType})`);
 
     // 检查超时
-    this.checkDeadline(task.taskId);
+    void this.checkDeadline(task.taskId);
   }
 
   /**
@@ -100,7 +103,9 @@ export class SimpleNegotiationRouter {
     // 添加报价
     negotiation.bids.push(bid);
 
-    console.log(`[SimpleRouter] Received bid for ${taskId}: ${bid.agentId} (willing: ${bid.willing.toFixed(3)})`);
+    console.log(
+      `[SimpleRouter] Received bid for ${taskId}: ${bid.agentId} (willing: ${bid.willing.toFixed(3)})`,
+    );
   }
 
   /**
@@ -133,7 +138,7 @@ export class SimpleNegotiationRouter {
     }
 
     // 按照 willing 降序排序
-    const sortedBids = [...negotiation.bids].sort((a, b) => b.willing - a.willing);
+    const sortedBids = [...negotiation.bids].toSorted((a, b) => b.willing - a.willing);
 
     const bestBid = sortedBids[0];
     const bestWilling = bestBid.willing;
@@ -161,34 +166,34 @@ export class SimpleNegotiationRouter {
     }
 
     const timeToDeadline = negotiation.deadline - Date.now();
-    const minWaitTime = 1000;  // 至少等 1 秒，让 agents 反应
+    const minWaitTime = 1000; // 至少等 1 秒，让 agents 反应
 
     const waitTime = Math.max(minWaitTime, timeToDeadline);
 
-    await new Promise(resolve => setTimeout(resolve, waitTime));
+    await new Promise((resolve) => setTimeout(resolve, waitTime));
 
     // 选择 winner
     const winner = this.selectWinner(taskId);
 
     if (winner) {
       // 分配任务
-      this.eventBus.publish({
-        type: 'TASK_ASSIGNED',
+      void this.eventBus.publish({
+        type: "TASK_ASSIGNED",
         payload: {
           taskId,
           assignedTo: winner,
-          winningWilling: negotiation.bids.find(b => b.agentId === winner)?.willing,
+          winningWilling: negotiation.bids.find((b) => b.agentId === winner)?.willing,
           totalBids: negotiation.bids.length,
         },
         timestamp: Date.now(),
       });
     } else {
       // 没有报价
-      this.eventBus.publish({
-        type: 'TASK_NEGOTIATION_FAILED',
+      void this.eventBus.publish({
+        type: "TASK_NEGOTIATION_FAILED",
         payload: {
           taskId,
-          reason: 'no_bids',
+          reason: "no_bids",
           announcement: negotiation.announcement,
         },
         timestamp: Date.now(),
@@ -223,7 +228,7 @@ export class SimpleNegotiationRouter {
     let winner = null;
 
     if (isDeadlinePassed && negotiation.bids.length > 0) {
-      const sortedBids = [...negotiation.bids].sort((a, b) => b.willing - a.willing);
+      const sortedBids = [...negotiation.bids].toSorted((a, b) => b.willing - a.willing);
       winner = sortedBids[0].agentId;
     }
 
@@ -238,7 +243,7 @@ export class SimpleNegotiationRouter {
   /**
    * 获取所有活动的协商
    */
-  getActiveNegotiations(): Array<{taskId: string; bids: number; timeElapsed: number}> {
+  getActiveNegotiations(): Array<{ taskId: string; bids: number; timeElapsed: number }> {
     const now = Date.now();
 
     return Array.from(this.activeNegotiations.entries()).map(([taskId, negotiation]) => ({
@@ -257,7 +262,7 @@ export class SimpleNegotiationRouter {
     }
 
     this.running = true;
-    console.log('[SimpleRouter] Started');
+    console.log("[SimpleRouter] Started");
   }
 
   /**
@@ -270,7 +275,7 @@ export class SimpleNegotiationRouter {
 
     this.running = false;
     this.activeNegotiations.clear();
-    console.log('[SimpleRouter] Stopped');
+    console.log("[SimpleRouter] Stopped");
   }
 
   /**

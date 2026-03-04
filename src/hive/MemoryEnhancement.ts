@@ -4,18 +4,17 @@
  * 记忆增强：语义搜索、向量嵌入、压缩、清理
  */
 
-import { getGlobalEventBus } from '../events/EventBus.js';
-import type { Event } from '../events/Event.js';
-import { EventType } from '../events/Event.js';
-import type { HiveConfig } from './HiveConfig.js';
+import type { Event } from "../events/Event.js";
+import { getGlobalEventBus } from "../events/EventBus.js";
+import type { HiveConfig } from "./HiveConfig.js";
 
 /**
  * 记忆嵌入向量
  */
 export interface MemoryEmbedding {
   memoryId: string;
-  embedding: number[];  // 向量表示 (dim=384, 768, etc.)
-  chunkIndex: number;  // 分块索引
+  embedding: number[]; // 向量表示 (dim=384, 768, etc.)
+  chunkIndex: number; // 分块索引
   timestamp: number;
 }
 
@@ -27,7 +26,7 @@ export interface MemoryChunk {
   memoryId: string;
   content: string;
   embedding?: number[];
-  importance: number;  // 0-1
+  importance: number; // 0-1
   accessCount: number;
   lastAccessed: number;
   createdAt: number;
@@ -40,33 +39,33 @@ export interface SemanticSearchResult {
   memoryId: string;
   chunkId: string;
   content: string;
-  similarity: number;  // 0-1
-  relevanceScore: number;  // 结合相似性和重要性
+  similarity: number; // 0-1
+  relevanceScore: number; // 结合相似性和重要性
 }
 
 /**
  * 记忆压缩配置
  */
 export interface CompressionConfig {
-  maxChunkSize: number;  // chars
-  minChunkOverlap: number;  // chars
-  compressionRatio: number;  // 0-1, 目标压缩比
+  maxChunkSize: number; // chars
+  minChunkOverlap: number; // chars
+  compressionRatio: number; // 0-1, 目标压缩比
 }
 
 /**
  * 记忆清理配置
  */
 export interface CleanupConfig {
-  cleanupInterval: number;  // ms
-  maxAge: number;  // ms
-  minImportance: number;  // 0-1
+  cleanupInterval: number; // ms
+  maxAge: number; // ms
+  minImportance: number; // 0-1
   minAccessCount: number;
 }
 
 /**
  * 向量嵌入模型
  */
-export type EmbeddingModel = 'minilm' | 'bge-small' | 'bge-base' | 'openai-embeddings';
+export type EmbeddingModel = "minilm" | "bge-small" | "bge-base" | "openai-embeddings";
 
 /**
  * Memory Enhancement
@@ -117,8 +116,8 @@ export class MemoryEnhancement {
     };
 
     this.cleanupConfig = {
-      cleanupInterval: config.cleanupConfig?.cleanupInterval || 3600000,  // 1 小时
-      maxAge: config.cleanupConfig?.maxAge || 2592000000,  // 30 天
+      cleanupInterval: config.cleanupConfig?.cleanupInterval || 3600000, // 1 小时
+      maxAge: config.cleanupConfig?.maxAge || 2592000000, // 30 天
       minImportance: config.cleanupConfig?.minImportance || 0.3,
       minAccessCount: config.cleanupConfig?.minAccessCount || 1,
     };
@@ -130,15 +129,12 @@ export class MemoryEnhancement {
    * 启动记忆增强
    */
   async start(): Promise<void> {
-    console.log('[MemEnh] Memory Enhancement started');
+    console.log("[MemEnh] Memory Enhancement started");
 
     // 启动定期清理
-    this.cleanupTimer = setInterval(
-      () => this.runCleanup(),
-      this.cleanupConfig.cleanupInterval,
-    );
+    this.cleanupTimer = setInterval(() => this.runCleanup(), this.cleanupConfig.cleanupInterval);
 
-    console.log('[MemEnh] Cleanup schedule started');
+    console.log("[MemEnh] Cleanup schedule started");
   }
 
   /**
@@ -150,7 +146,7 @@ export class MemoryEnhancement {
       this.cleanupTimer = undefined;
     }
 
-    console.log('[MemEnh] Memory Enhancement stopped');
+    console.log("[MemEnh] Memory Enhancement stopped");
   }
 
   /**
@@ -178,13 +174,13 @@ export class MemoryEnhancement {
       const start = index;
       const end = Math.min(index + chunkSize, content.length);
       chunks.push(content.substring(start, end));
-      
+
       // 移动到下一块，保留重叠部分
       index = end - overlap;
-      
+
       // 确保_index前进，防止无限循环
       if (index <= start) {
-        index = end;  // 跳过剩余内容
+        index = end; // 跳过剩余内容
       }
     }
 
@@ -196,8 +192,8 @@ export class MemoryEnhancement {
         chunkId,
         memoryId,
         content: chunks[i],
-        embedding: undefined,  // 稍后计算
-        importance: this.calculateImportance(chunks[i]),  // 初始重要性
+        embedding: undefined, // 稍后计算
+        importance: this.calculateImportance(chunks[i]), // 初始重要性
         accessCount: 0,
         lastAccessed: Date.now(),
         createdAt: Date.now(),
@@ -237,8 +233,10 @@ export class MemoryEnhancement {
     score += Math.min(0.2, content.length / 1000);
 
     // 关键词加成
-    const importantKeywords = ['important', 'critical', 'key', 'essential', '核心', '重要', '关键'];
-    const keywordCount = importantKeywords.filter(kw => content.toLowerCase().includes(kw)).length;
+    const importantKeywords = ["important", "critical", "key", "essential", "核心", "重要", "关键"];
+    const keywordCount = importantKeywords.filter((kw) =>
+      content.toLowerCase().includes(kw),
+    ).length;
     score += keywordCount * 0.1;
 
     // 问号加成（问题通常表示需要记住的疑问）
@@ -265,7 +263,7 @@ export class MemoryEnhancement {
 
     // 归一化
     const norm = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0));
-    return vector.map(v => v / norm);
+    return vector.map((v) => v / norm);
   }
 
   /**
@@ -275,8 +273,8 @@ export class MemoryEnhancement {
     let hash = 0;
     for (let i = 0; i < text.length; i++) {
       const char = text.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;  // Convert to 32-bit integer
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash);
   }
@@ -291,7 +289,7 @@ export class MemoryEnhancement {
     // 计算相似度
     const results: Array<{ chunk: MemoryChunk; similarity: number }> = [];
 
-    for (const [chunkId, chunk] of this.chunks.entries()) {
+    for (const [_chunkId, chunk] of this.chunks.entries()) {
       if (!chunk.embedding) {
         continue;
       }
@@ -299,15 +297,11 @@ export class MemoryEnhancement {
       const similarity = this.cosineSimilarity(queryEmbedding, chunk.embedding);
 
       // 考虑重要性
-      const relevanceScore = similarity * 0.7 + chunk.importance * 0.3;
-
       results.push({ chunk, similarity });
     }
 
     // 排序并取前 N
-    const topResults = results
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit);
+    const topResults = results.toSorted((a, b) => b.similarity - a.similarity).slice(0, limit);
 
     // 更新访问统计
     for (const result of topResults) {
@@ -316,7 +310,7 @@ export class MemoryEnhancement {
     }
 
     // 转换为语义搜索结果
-    return topResults.map(r => ({
+    return topResults.map((r) => ({
       memoryId: r.chunk.memoryId,
       chunkId: r.chunk.chunkId,
       content: r.chunk.content,
@@ -349,26 +343,34 @@ export class MemoryEnhancement {
   /**
    * 记忆压缩
    */
-  async compressMemory(memoryId: string, content: string): Promise<{ compressedContent: string; compressionRatio: number }> {
+  async compressMemory(
+    memoryId: string,
+    content: string,
+  ): Promise<{ compressedContent: string; compressionRatio: number }> {
     // 创建分块
     await this.createMemoryChunks(memoryId, content);
 
     // 根据重要性筛选分块
     const chunkIds = this.memoryToChunks.get(memoryId) || [];
-    const chunks = chunkIds.map(id => this.chunks.get(id)!).filter(Boolean);
+    const chunks = chunkIds.map((id) => this.chunks.get(id)!).filter(Boolean);
 
     // 过滤低重要性分块
-    const importantChunks = chunks.filter(c => c.importance >= 0.5);
+    const importantChunks = chunks.filter((c) => c.importance >= 0.5);
 
     // 合并分块
-    const compressedChunks = importantChunks.slice(0, Math.ceil(chunks.length * this.compressionConfig.compressionRatio));
+    const compressedChunks = importantChunks.slice(
+      0,
+      Math.ceil(chunks.length * this.compressionConfig.compressionRatio),
+    );
 
-    const compressedContent = compressedChunks.map(c => c.content).join('\n\n');
+    const compressedContent = compressedChunks.map((c) => c.content).join("\n\n");
     const compressionRatio = content.length > 0 ? compressedContent.length / content.length : 1;
 
     this.stats.compressionSaved += content.length - compressedContent.length;
 
-    console.log(`[MemEnh] Compressed memory ${memoryId}: ${(compressionRatio * 100).toFixed(1)}% retained`);
+    console.log(
+      `[MemEnh] Compressed memory ${memoryId}: ${(compressionRatio * 100).toFixed(1)}% retained`,
+    );
 
     return { compressedContent, compressionRatio };
   }
@@ -446,12 +448,10 @@ export class MemoryEnhancement {
     const chunksArray = Array.from(this.chunks.values());
 
     const total = chunksArray.length;
-    const avgImportance = total > 0
-      ? chunksArray.reduce((sum, c) => sum + c.importance, 0) / total
-      : 0;
-    const avgAccessCount = total > 0
-      ? chunksArray.reduce((sum, c) => sum + c.accessCount, 0) / total
-      : 0;
+    const avgImportance =
+      total > 0 ? chunksArray.reduce((sum, c) => sum + c.importance, 0) / total : 0;
+    const avgAccessCount =
+      total > 0 ? chunksArray.reduce((sum, c) => sum + c.accessCount, 0) / total : 0;
 
     return { total, avgImportance, avgAccessCount };
   }
@@ -495,6 +495,6 @@ export class MemoryEnhancement {
       this.cleanupTimer = undefined;
     }
 
-    console.log('[MemEnh] Memory Enhancement reset');
+    console.log("[MemEnh] Memory Enhancement reset");
   }
 }
