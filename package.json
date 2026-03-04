@@ -4,14 +4,14 @@
   "description": "HiveMind AI Agent Framework - Multi-agent architecture with emergent consciousness through swarm intelligence",
   "keywords": [
     "agent",
-    "swarm",
+    "ai-framework",
+    "emergent-intelligence",
+    "event-bus",
     "hive-mind",
     "multi-agent",
-    "emergent-intelligence",
     "orchestrator",
     "state-machine",
-    "event-bus",
-    "ai-framework"
+    "swarm"
   ],
   "homepage": "https://github.com/Churchillhuang/hivemind",
   "bugs": {
@@ -24,7 +24,7 @@
     "url": "git+https://github.com/Churchillhuang/hivemind.git"
   },
   "bin": {
-    "openclaw": "openclaw.mjs"
+    "hivemind": "openclaw.mjs"
   },
   "directories": {
     "doc": "docs",
@@ -152,6 +152,7 @@
     "test:ui": "pnpm lint:ui:no-raw-window-open && pnpm --dir ui test",
     "test:voicecall:closedloop": "vitest run extensions/voice-call/src/manager.test.ts extensions/voice-call/src/media-stream.test.ts src/plugins/voice-call.plugin.test.ts --maxWorkers=1",
     "test:watch": "vitest",
+    "tsgo": "tsc --noEmit -p tsconfig.json",
     "tui": "node scripts/run-node.mjs tui",
     "tui:dev": "OPENCLAW_PROFILE=dev CLAWDBOT_PROFILE=dev node scripts/run-node.mjs --dev tui",
     "ui:build": "node scripts/ui.js build",
@@ -218,8 +219,13 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "oxfmt": "^0.36.0",
+    "oxlint": "^1.51.0",
+    "oxlint-tsgolint": "^0.15.0",
+    "pnpm": "^10.30.3",
     "tsx": "^4.7.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=22.0.0"

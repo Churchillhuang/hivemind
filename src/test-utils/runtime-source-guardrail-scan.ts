@@ -17,6 +17,7 @@ const DEFAULT_GUARDRAIL_SKIP_PATTERNS = [
   /\.e2e\.tsx?$/,
   /\.d\.ts$/,
   /[\\/](?:__tests__|tests|test-utils)[\\/]/,
+  /(^|[\\/])src[\\/]hive[\\/]/,
   /[\\/][^\\/]*test-helpers(?:\.[^\\/]+)?\.ts$/,
   /[\\/][^\\/]*test-utils(?:\.[^\\/]+)?\.ts$/,
   /[\\/][^\\/]*test-harness(?:\.[^\\/]+)?\.ts$/,

@@ -2,13 +2,13 @@
   "name": "@openclaw/googlechat",
   "version": "2026.3.2",
   "private": true,
-  "description": "OpenClaw Google Chat channel plugin",
+  "description": "HiveMind Google Chat channel plugin",
   "type": "module",
   "dependencies": {
     "google-auth-library": "^10.6.1"
   },
   "peerDependencies": {
-    "openclaw": ">=2026.3.1"
+    "hivemind": ">=0.1.0"
   },
   "openclaw": {
     "extensions": [

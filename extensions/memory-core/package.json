@@ -2,10 +2,10 @@
   "name": "@openclaw/memory-core",
   "version": "2026.3.2",
   "private": true,
-  "description": "OpenClaw core memory search plugin",
+  "description": "HiveMind core memory search plugin",
   "type": "module",
   "peerDependencies": {
-    "openclaw": ">=2026.3.1"
+    "hivemind": ">=0.1.0"
   },
   "openclaw": {
     "extensions": [

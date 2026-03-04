@@ -12,27 +12,27 @@
  *    - 示例：file_analysis → 投标选择最优
  */
 
-import { BaseAgent } from '../core/Agent.js';
-import { Event, EventType } from '../events/Event.js';
-import { EventBus } from '../events/EventBus.js';
-import type { HiveConfig } from './HiveConfig.js';
-import { NegotiationRouter } from './NegotiationRouter.js';
+import { BaseAgent } from "../core/Agent.js";
+import { Event, EventType } from "../events/Event.js";
+import { EventBus } from "../events/EventBus.js";
+import type { HiveConfig } from "./HiveConfig.js";
+import { NegotiationRouter } from "./NegotiationRouter.js";
 
 /**
  * Task - 待处理任务
  */
 export interface Task {
   id: string;
-  type: 'message' | 'action' | 'query';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  type: "message" | "action" | "query";
+  priority: "low" | "medium" | "high" | "urgent";
   sourceAgent: string;
   payload: {
-    [key: string]: any;
+    [key: string]: unknown;
   };
   createdAt: number;
-  status: 'pending' | 'Processing' | 'completed' | 'failed';
+  status: "pending" | "Processing" | "completed" | "failed";
   assignedAgent?: string;
-  result?: any;
+  result?: unknown;
   error?: string;
 }
 
@@ -41,7 +41,7 @@ export interface Task {
  */
 export interface AgentInfo {
   id: string;
-  type: 'system' | 'functional';
+  type: "system" | "functional";
   role: string;
   capabilities: string[];
   isRunning: boolean;
@@ -60,9 +60,9 @@ export interface RoutingDecision {
   taskId: string;
   targetAgent: string;
   reasoning: string;
-  routingMode: 'direct' | 'negotiated';  // 新增：路由模式
+  routingMode: "direct" | "negotiated"; // 新增：路由模式
   newAgent?: {
-    type: 'system' | 'functional';
+    type: "system" | "functional";
     role: string;
     description: string;
   };
@@ -71,9 +71,9 @@ export interface RoutingDecision {
 /**
  * 路由模式定义
  */
-enum RoutingMode {
-  DIRECT = 'direct',       // 硬编码规则，快速、反射式
-  NEGOTIATED = 'negotiated',  // 协商路由，动态、优化
+export enum RoutingMode {
+  DIRECT = "direct", // 硬编码规则，快速、反射式
+  NEGOTIATED = "negotiated", // 协商路由，动态、优化
 }
 
 export class Orchestrator extends BaseAgent {
@@ -81,8 +81,8 @@ export class Orchestrator extends BaseAgent {
   private taskQueue: Map<string, Task> = new Map();
   private agents: Map<string, AgentInfo> = new Map();
   private routingRules: Map<string, string[]> = new Map(); // 规则 -> agent IDs
-  private directRoutingTasks: Set<string>;  // 使用直接路由的任务类型
-  private negotiationRouter?: NegotiationRouter;  // 协商路由器
+  private directRoutingTasks: Set<string>; // 使用直接路由的任务类型
+  private negotiationRouter?: NegotiationRouter; // 协商路由器
 
   constructor(
     config: { id: string; role: string; description?: string },
@@ -90,12 +90,15 @@ export class Orchestrator extends BaseAgent {
     eventBus?: EventBus,
     negotiationRouter?: NegotiationRouter,
   ) {
-    super({
-      id: config.id,
-      role: config.role,
-      type: 'system',
-      description: config.description,
-    }, eventBus);
+    super(
+      {
+        id: config.id,
+        role: config.role,
+        type: "system",
+        description: config.description,
+      },
+      eventBus,
+    );
 
     this.hiveConfig = hiveConfig;
     this.negotiationRouter = negotiationRouter;
@@ -110,14 +113,13 @@ export class Orchestrator extends BaseAgent {
    */
   private initializeRoutingRules(): void {
     // 系统级 Agents 的固定路由（直接路由 - 像腦幹）
-    this.routingRules.set('message', ['interface_agent_001']);
-    this.routingRules.set('memory_query', ['memory_agent_001']);
-    this.routingRules.set('reflection', ['reflection_agent_001']);
+    this.routingRules.set("message", ["interface_agent_001"]);
+    this.routingRules.set("memory_query", ["memory_agent_001"]);
+    this.routingRules.set("reflection", ["reflection_agent_001"]);
 
     // 功能级 Agents（如果已预定义，也用直接路由）
-    this.routingRules.set('moltbook_post', ['moltbook_bot']);
-    this.routingRules.set('wordpress_upload', ['wp_uploader']);
-    this.routingRules.set('file_analysis', ['file_analyzer']);
+    this.routingRules.set("moltbook_post", ["moltbook_bot"]);
+    this.routingRules.set("wordpress_upload", ["wp_uploader"]);
   }
 
   /**
@@ -126,9 +128,9 @@ export class Orchestrator extends BaseAgent {
    */
   private initializeDirectRoutingTasks(): void {
     // 系统核心功能 - 必须快速、直接
-    this.directRoutingTasks.add('message');           // 用户消息处理
-    this.directRoutingTasks.add('memory_query');      // 记忆查询
-    this.directRoutingTasks.add('reflection');        // 反思
+    this.directRoutingTasks.add("message"); // 用户消息处理
+    this.directRoutingTasks.add("memory_query"); // 记忆查询
+    this.directRoutingTasks.add("reflection"); // 反思
 
     // 如果你需要某些预定义功能也用直接路由，可以添加：
     // this.directRoutingTasks.add('moltbook_post');
@@ -138,7 +140,7 @@ export class Orchestrator extends BaseAgent {
    * 判断使用哪种路由模式
    */
   private getRoutingMode(taskType: string): RoutingMode {
-    if (this.directRoutingTasks.has(taskType)) {
+    if (this.directRoutingTasks.has(taskType) || this.routingRules.has(taskType)) {
       return RoutingMode.DIRECT;
     }
 
@@ -166,10 +168,10 @@ export class Orchestrator extends BaseAgent {
 
     // 注册已知的系统级 agents
     this.registerAgent({
-      id: 'interface_agent_001',
-      type: 'system',
-      role: 'Interface Agent',
-      capabilities: ['handle_user_message', '对话交互'],
+      id: "interface_agent_001",
+      type: "system",
+      role: "Interface Agent",
+      capabilities: ["handle_user_message", "对话交互"],
       isRunning: false,
       currentTasks: [],
       stats: {
@@ -180,10 +182,10 @@ export class Orchestrator extends BaseAgent {
     });
 
     this.registerAgent({
-      id: 'memory_agent_001',
-      type: 'system',
-      role: 'Memory Agent',
-      capabilities: ['memory_query', 'memory_retrieval', '记忆检索'],
+      id: "memory_agent_001",
+      type: "system",
+      role: "Memory Agent",
+      capabilities: ["memory_query", "memory_retrieval", "记忆检索"],
       isRunning: false,
       currentTasks: [],
       stats: {
@@ -202,8 +204,8 @@ export class Orchestrator extends BaseAgent {
 
     // 订阅协商路由事件
     if (this.negotiationRouter) {
-      this.subscribeTo('TASK_ASSIGNED');
-      this.subscribeTo('TASK_NEGOTIATION_FAILED');
+      this.subscribeTo("TASK_ASSIGNED");
+      this.subscribeTo("TASK_NEGOTIATION_FAILED");
     }
 
     await this.eventBus?.publish({
@@ -245,31 +247,31 @@ export class Orchestrator extends BaseAgent {
 
   async handle(event: Event): Promise<void> {
     switch (event.type) {
-      case EventType.NEW_MESSAGE:
+      case "NEW_MESSAGE":
         await this.handleNewMessage(event);
         break;
 
-      case EventType.TASK_REQUESTED:
+      case "TASK_REQUESTED":
         await this.handleTaskRequest(event);
         break;
 
-      case EventType.AGENT_STARTED:
+      case "AGENT_STARTED":
         await this.handleAgentStarted(event);
         break;
 
-      case EventType.AGENT_STOPPED:
+      case "AGENT_STOPPED":
         await this.handleAgentStopped(event);
         break;
 
-      case EventType.MESSAGE_PROCESSED:
+      case "MESSAGE_PROCESSED":
         await this.handleMessageProcessed(event);
         break;
 
-      case 'TASK_ASSIGNED':
+      case "TASK_ASSIGNED":
         await this.handleTaskAssigned(event);
         break;
 
-      case 'TASK_NEGOTIATION_FAILED':
+      case "TASK_NEGOTIATION_FAILED":
         await this.handleNegotiationFailed(event);
         break;
     }
@@ -279,6 +281,10 @@ export class Orchestrator extends BaseAgent {
    * 处理任务分配（协商路由）
    */
   private async handleTaskAssigned(event: Event): Promise<void> {
+    if (event.sourceAgent === this.id) {
+      return;
+    }
+
     const assignment = event.payload as {
       taskId: string;
       assignedTo: string;
@@ -289,19 +295,34 @@ export class Orchestrator extends BaseAgent {
     const task = this.taskQueue.get(assignment.taskId);
     if (task) {
       task.assignedAgent = assignment.assignedTo;
-      task.status = 'Processing';
-
-      await this.eventBus?.publish({
-        type: EventType.TASK_ASSIGNED,
-        sourceAgent: this.id,
-        payload: {
-          taskId: task.id,
-          assignedTo: assignment.assignedTo,
-        },
+      task.status = "Processing";
+    } else {
+      // Keep failure/assignment accounting visible even when task was externally injected.
+      this.taskQueue.set(assignment.taskId, {
+        id: assignment.taskId,
+        type: "action",
+        priority: "medium",
+        sourceAgent: event.sourceAgent,
+        payload: {},
+        createdAt: Date.now(),
+        status: "Processing",
+        assignedAgent: assignment.assignedTo,
       });
     }
 
-    console.log(`[Orchestrator ${this.id}] Task negotiated and assigned: ${assignment.taskId} → ${assignment.assignedTo}`);
+    await this.eventBus?.publish({
+      type: EventType.TASK_ASSIGNED,
+      sourceAgent: "Orchestrator",
+      routingMode: "negotiated",
+      payload: {
+        taskId: assignment.taskId,
+        assignedTo: assignment.assignedTo,
+      },
+    });
+
+    console.log(
+      `[Orchestrator ${this.id}] Task negotiated and assigned: ${assignment.taskId} → ${assignment.assignedTo}`,
+    );
   }
 
   /**
@@ -311,16 +332,29 @@ export class Orchestrator extends BaseAgent {
     const payload = event.payload as {
       taskId: string;
       reason: string;
-      announcement: any;
+      announcement: unknown;
     };
 
     // 记录失败，可以尝试降级到直接路由
-    console.error(`[Orchestrator ${this.id}] Negotiation failed for task ${payload.taskId}: ${payload.reason}`);
+    console.error(
+      `[Orchestrator ${this.id}] Negotiation failed for task ${payload.taskId}: ${payload.reason}`,
+    );
 
     const task = this.taskQueue.get(payload.taskId);
     if (task) {
-      task.status = 'failed';
+      task.status = "failed";
       task.error = `Negotiation failed: ${payload.reason}`;
+    } else {
+      this.taskQueue.set(payload.taskId, {
+        id: payload.taskId,
+        type: "action",
+        priority: "medium",
+        sourceAgent: event.sourceAgent,
+        payload: payload.announcement ?? {},
+        createdAt: Date.now(),
+        status: "failed",
+        error: `Negotiation failed: ${payload.reason}`,
+      });
     }
   }
 
@@ -330,12 +364,12 @@ export class Orchestrator extends BaseAgent {
   async handleNewMessage(event: Event): Promise<void> {
     const task: Task = {
       id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type: 'message',
-      priority: 'medium',
+      type: "message",
+      priority: "medium",
       sourceAgent: event.sourceAgent,
       payload: event.payload,
       createdAt: Date.now(),
-      status: 'pending',
+      status: "pending",
     };
 
     this.taskQueue.set(task.id, task);
@@ -351,12 +385,12 @@ export class Orchestrator extends BaseAgent {
   async handleTaskRequest(event: Event): Promise<void> {
     const task: Task = {
       id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type: 'action',
-      priority: 'medium',
+      type: "action",
+      priority: "medium",
       sourceAgent: event.sourceAgent,
       payload: event.payload,
       createdAt: Date.now(),
-      status: 'pending',
+      status: "pending",
     };
 
     this.taskQueue.set(task.id, task);
@@ -370,7 +404,7 @@ export class Orchestrator extends BaseAgent {
    * 混合路由决策
    */
   private makeRoutingDecision(task: Task): RoutingDecision {
-    const taskType = task.payload.taskType || task.type as string;
+    const taskType = task.payload.taskType || (task.type as string);
     const routingMode = this.getRoutingMode(taskType);
 
     if (routingMode === RoutingMode.DIRECT) {
@@ -396,17 +430,17 @@ export class Orchestrator extends BaseAgent {
         taskId: task.id,
         targetAgent,
         reasoning: `Direct routing: ${taskType} → ${targetAgent} (brainstem reflex)`,
-        routingMode: 'direct',
+        routingMode: "direct",
       };
     }
 
     // 默认: interface_agent
-    const defaultTarget = this.routingRules.get('message')?.[0] || 'interface_agent_001';
+    const defaultTarget = this.routingRules.get("message")?.[0] || "interface_agent_001";
     return {
       taskId: task.id,
       targetAgent: defaultTarget,
       reasoning: `Default direct routing → ${defaultTarget}`,
-      routingMode: 'direct',
+      routingMode: "direct",
     };
   }
 
@@ -431,15 +465,17 @@ export class Orchestrator extends BaseAgent {
     if (this.negotiationRouter) {
       this.negotiationRouter.announceTask(announcement);
 
-      console.log(`[Orchestrator ${this.id}] Task announced for negotiation: ${task.id} (${taskType})`);
+      console.log(
+        `[Orchestrator ${this.id}] Task announced for negotiation: ${task.id} (${taskType})`,
+      );
     }
 
     // 任务最终通过 TASK_ASSIGNED 事件回调处理
     return {
       taskId: task.id,
-      targetAgent: 'pending_negotiation',  // 临时值，待协商完成
+      targetAgent: "pending_negotiation", // 临时值，待协商完成
       reasoning: `Task announced for negotiation (cortex coordination)`,
-      routingMode: 'negotiated',
+      routingMode: "negotiated",
     };
   }
 
@@ -448,7 +484,7 @@ export class Orchestrator extends BaseAgent {
    */
   private async executeRoutingDecision(decision: RoutingDecision): Promise<void> {
     // 协商模式不需要立即执行（等待 TASK_ASSIGNED 事件）
-    if (decision.routingMode === 'negotiated') {
+    if (decision.routingMode === "negotiated") {
       console.log(`[Orchestrator ${this.id}] Waiting for negotiation completion...`);
       return;
     }
@@ -461,25 +497,28 @@ export class Orchestrator extends BaseAgent {
     }
 
     task.assignedAgent = decision.targetAgent;
-    task.status = 'Processing';
+    task.status = "Processing";
 
     await this.eventBus?.publish({
       type: EventType.TASK_ASSIGNED,
       sourceAgent: this.id,
+      routingMode: "direct",
       payload: {
         taskId: task.id,
         assignedTo: decision.targetAgent,
       },
     });
 
-    console.log(`[Orchestrator ${this.id}] Direct routing: ${task.id} → ${decision.targetAgent} (${decision.reasoning})`);
+    console.log(
+      `[Orchestrator ${this.id}] Direct routing: ${task.id} → ${decision.targetAgent} (${decision.reasoning})`,
+    );
   }
 
   /**
    * 创建新 Agent（动态）
    */
   private async createAgent(config: {
-    type: 'system' | 'functional';
+    type: "system" | "functional";
     role: string;
     description: string;
   }): Promise<void> {
@@ -504,7 +543,7 @@ export class Orchestrator extends BaseAgent {
 
     // 发布 Agent 创建事件
     await this.eventBus?.publish({
-      type: 'AGENT_CREATE_REQUEST',
+      type: "AGENT_CREATE_REQUEST",
       sourceAgent: this.id,
       payload: {
         agentId,
@@ -607,9 +646,9 @@ export class Orchestrator extends BaseAgent {
     let processing = 0;
 
     for (const task of this.taskQueue.values()) {
-      if (task.status === 'pending') {
+      if (task.status === "pending") {
         pending += 1;
-      } else if (task.status === 'Processing') {
+      } else if (task.status === "Processing") {
         processing += 1;
       }
     }

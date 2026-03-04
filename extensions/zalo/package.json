@@ -1,7 +1,7 @@
 {
   "name": "@openclaw/zalo",
   "version": "2026.3.2",
-  "description": "OpenClaw Zalo channel plugin",
+  "description": "HiveMind Zalo channel plugin",
   "type": "module",
   "dependencies": {
     "undici": "7.22.0",

@@ -5,9 +5,10 @@
  * Enabled for true coordination architecture.
  */
 
-import { BaseAgent } from './BaseAgent.js';
-import type { Event } from '../events/Event.js';
-import type { TaskAnnouncement, Bid } from './NegotiationRouter.js';
+import { BaseAgent } from "../core/Agent.js";
+import type { Event } from "../events/Event.js";
+import type { EventBus } from "../events/EventBus.js";
+import type { TaskAnnouncement, Bid } from "./NegotiationRouter.js";
 
 export interface AgentCapabilities {
   taskTypes: string[];
@@ -18,17 +19,17 @@ export interface AgentCapabilities {
 
 export class CoordinationAgent extends BaseAgent {
   protected capabilities: AgentCapabilities;
-  protected currentLoad: number = 0;  // 0-1
+  protected currentLoad: number = 0; // 0-1
 
   constructor(
     config: {
       id: string;
       role: string;
-      type: 'system' | 'functional';
+      type: "system" | "functional";
       description?: string;
     },
     capabilities: AgentCapabilities,
-    eventBus?: any,
+    eventBus?: EventBus,
   ) {
     super(config, eventBus);
     this.capabilities = capabilities;
@@ -38,8 +39,22 @@ export class CoordinationAgent extends BaseAgent {
 
   private initializeNegotiationHandlers(): void {
     // Subscribe to task announcements
-    this.subscribeTo('TASK_ANNOUNCEMENT');
-    this.subscribeTo('TASK_ASSIGNED');
+    this.subscribeTo("TASK_ANNOUNCEMENT");
+    this.subscribeTo("TASK_ASSIGNED");
+  }
+
+  async start(): Promise<void> {
+    if (this.running) {
+      return;
+    }
+    this.running = true;
+  }
+
+  async stop(): Promise<void> {
+    if (!this.running) {
+      return;
+    }
+    this.running = false;
   }
 
   /**
@@ -47,7 +62,7 @@ export class CoordinationAgent extends BaseAgent {
    */
   protected getCurrentLoad(): number {
     // Load based on active tasks
-    const activeTasks = this.getState().activeTasks as number || 0;
+    const activeTasks = (this.getState().activeTasks as number) || 0;
     const maxTasks = this.capabilities.maxConcurrentTasks || 5;
 
     return Math.min(1, activeTasks / maxTasks);
@@ -56,7 +71,7 @@ export class CoordinationAgent extends BaseAgent {
   /**
    * Estimate time to complete task
    */
-  protected estimateTaskTime(taskType: string, taskData: unknown): number {
+  protected estimateTaskTime(_taskType: string, _taskData: unknown): number {
     // Default: use avg task time or default 5000ms
     return this.capabilities.avgTaskTimeMs || 5000;
   }
@@ -72,8 +87,8 @@ export class CoordinationAgent extends BaseAgent {
 
     // Check for required capabilities
     if (task.requiredCapabilities.length > 0) {
-      const hasCapabilities = task.requiredCapabilities.every(cap =>
-        this.capabilities.skills.includes(cap)
+      const hasCapabilities = task.requiredCapabilities.every((cap) =>
+        this.capabilities.skills.includes(cap),
       );
       if (!hasCapabilities) {
         return false;
@@ -93,11 +108,12 @@ export class CoordinationAgent extends BaseAgent {
     }
 
     const bid: Bid = {
+      taskId: task.taskId,
       agentId: this.id,
-      capabilities: this.capabilities.skils || this.capabilities.taskTypes || [],
+      capabilities: this.capabilities.skills || this.capabilities.taskTypes || [],
       estimatedTimeMs: this.estimateTaskTime(task.taskType, null),
       currentLoad: this.getCurrentLoad(),
-      bidScore: 0,  // Will be calculated by NegotiationRouter
+      bidScore: 0, // Will be calculated by NegotiationRouter
       timestamp: Date.now(),
     };
 
@@ -107,9 +123,13 @@ export class CoordinationAgent extends BaseAgent {
   /**
    * Send peer-to-peer message
    */
-  async sendPeerMessage(toAgentId: string, content: string, data?: Record<string, unknown>): Promise<unknown> {
+  async sendPeerMessage(
+    toAgentId: string,
+    content: string,
+    data?: Record<string, unknown>,
+  ): Promise<unknown> {
     const message = {
-      type: 'direct' as const,
+      type: "direct" as const,
       from: this.id,
       to: toAgentId,
       content,
@@ -118,7 +138,7 @@ export class CoordinationAgent extends BaseAgent {
     };
 
     await this.eventBus?.publish({
-      type: 'AGENT_MESSAGE',
+      type: "AGENT_MESSAGE",
       sourceAgent: this.id,
       payload: message,
     });
@@ -132,10 +152,10 @@ export class CoordinationAgent extends BaseAgent {
   async requestHelp(
     toAgentId: string,
     request: string,
-    data?: Record<string, unknown>
+    data?: Record<string, unknown>,
   ): Promise<unknown> {
     const requestMsg = {
-      type: 'request' as const,
+      type: "request" as const,
       from: this.id,
       to: toAgentId,
       content: request,
@@ -144,7 +164,7 @@ export class CoordinationAgent extends BaseAgent {
     };
 
     await this.eventBus?.publish({
-      type: 'AGENT_REQUEST',
+      type: "AGENT_REQUEST",
       sourceAgent: this.id,
       payload: requestMsg,
     });
@@ -152,7 +172,7 @@ export class CoordinationAgent extends BaseAgent {
     console.log(`[${this.id}] Requested help from ${toAgentId}: ${request}`);
 
     // In a real implementation, this would await a response
-    return { status: 'sent' };
+    return { status: "sent" };
   }
 
   /**
@@ -166,12 +186,14 @@ export class CoordinationAgent extends BaseAgent {
 
     if (bid) {
       await this.eventBus?.publish({
-        type: 'TASK_BID',
+        type: "TASK_BID",
         sourceAgent: this.id,
         payload: bid,
       });
 
-      console.log(`[${this.id}] Placed bid for task: ${task.taskId} (score: ${bid.bidScore.toFixed(3)})`);
+      console.log(
+        `[${this.id}] Placed bid for task: ${task.taskId} (score: ${bid.bidScore.toFixed(3)})`,
+      );
     }
   }
 
@@ -186,7 +208,7 @@ export class CoordinationAgent extends BaseAgent {
 
       // Increment task count
       const state = this.getState();
-      state.activeTasks = (state.activeTasks as number || 0) + 1;
+      state.activeTasks = ((state.activeTasks as number) || 0) + 1;
       this.setState(state);
 
       // Start processing task
@@ -202,17 +224,17 @@ export class CoordinationAgent extends BaseAgent {
     console.log(`[${this.id}] Processing task: ${taskId}`);
 
     // Simulate work
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise((resolve) => setTimeout(resolve, 5000));
 
     // Decrement task count
     const state = this.getState();
-    state.activeTasks = Math.max(0, (state.activeTasks as number || 1) - 1);
-    state.tasksCompleted = (state.tasksCompleted as number || 0) + 1;
+    state.activeTasks = Math.max(0, ((state.activeTasks as number) || 1) - 1);
+    state.tasksCompleted = ((state.tasksCompleted as number) || 0) + 1;
     this.setState(state);
 
     // Publish completion
     await this.eventBus?.publish({
-      type: 'TASK_COMPLETED',
+      type: "TASK_COMPLETED",
       sourceAgent: this.id,
       payload: { taskId },
     });
@@ -225,16 +247,16 @@ export class CoordinationAgent extends BaseAgent {
    */
   async handle(event: Event): Promise<void> {
     switch (event.type) {
-      case 'TASK_ANNOUNCEMENT':
+      case "TASK_ANNOUNCEMENT":
         await this.handleTaskAnnouncement(event);
         break;
 
-      case 'TASK_ASSIGNED':
+      case "TASK_ASSIGNED":
         await this.handleTaskAssignment(event);
         break;
 
       default:
-        await super.handle(event);
+        return;
     }
   }
 }

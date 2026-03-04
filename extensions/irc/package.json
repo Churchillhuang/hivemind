@@ -1,7 +1,7 @@
 {
   "name": "@openclaw/irc",
   "version": "2026.3.2",
-  "description": "OpenClaw IRC channel plugin",
+  "description": "HiveMind IRC channel plugin",
   "type": "module",
   "dependencies": {
     "zod": "^4.3.6"

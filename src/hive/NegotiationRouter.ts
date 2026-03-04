@@ -9,16 +9,17 @@
  * This achieves true coordination, not command.
  */
 
-import type { Event } from '../events/Event.js';
-import { EventBus } from '../events/Event.js';
-import type { HiveConfig } from './HiveConfig.js';
+import type { Event } from "../events/Event.js";
+import { EventBus } from "../events/EventBus.js";
+import type { HiveConfig } from "./HiveConfig.js";
 
 export interface Bid {
+  taskId: string;
   agentId: string;
   capabilities: string[];
   estimatedTimeMs: number;
-  currentLoad: number;  // 0-1
-  bidScore: number;     // Calculated score
+  currentLoad: number; // 0-1
+  bidScore: number; // Calculated score
   timestamp: number;
 }
 
@@ -26,7 +27,7 @@ export interface TaskAnnouncement {
   taskId: string;
   taskType: string;
   requiredCapabilities: string[];
-  priority: 'urgent' | 'normal' | 'low';
+  priority: "urgent" | "normal" | "low";
   description: string;
   timestamp: number;
   deadline?: number;
@@ -41,16 +42,19 @@ export interface TaskAssignment {
 
 export class NegotiationRouter {
   private eventBus: EventBus;
-  private config: HiveConfig;
+  public config: HiveConfig;
   private negotiationTimeout: number;
 
   // Current negotiations
-  private pendingNegotiations: Map<string, {
-    announcement: TaskAnnouncement;
-    bids: Map<string, Bid>;
-    deadline: number;
-    timer?: NodeJS.Timeout;
-  }> = new Map();
+  private pendingNegotiations: Map<
+    string,
+    {
+      announcement: TaskAnnouncement;
+      bids: Map<string, Bid>;
+      deadline: number;
+      timer?: NodeJS.Timeout;
+    }
+  > = new Map();
 
   constructor(config: HiveConfig, eventBus?: EventBus) {
     this.config = config;
@@ -62,14 +66,18 @@ export class NegotiationRouter {
 
   private initializeEventHandlers(): void {
     // Listen for task announcements
-    this.eventBus.subscribe('TASK_ANNOUNCEMENT', (event) => {
+    this.eventBus.subscribe("TASK_ANNOUNCEMENT", (event) => {
       this.handleTaskAnnouncement(event);
     });
 
     // Listen for bids
-    this.eventBus.subscribe('TASK_BID', (event) => {
+    this.eventBus.subscribe("TASK_BID", (event) => {
       this.handleTaskBid(event);
     });
+  }
+
+  private handleTaskAnnouncement(_event: Event): void {
+    // Announcements are initiated via `announceTask`; no action needed on fanout.
   }
 
   /**
@@ -92,11 +100,15 @@ export class NegotiationRouter {
     this.pendingNegotiations.set(task.taskId, negotiation);
 
     // Announce to all agents
-    this.eventBus.publish({
-      type: 'TASK_ANNOUNCEMENT',
-      sourceAgent: 'NegotiationRouter',
-      payload: task,
-    });
+    void this.eventBus
+      .publish({
+        type: "TASK_ANNOUNCEMENT",
+        sourceAgent: "NegotiationRouter",
+        payload: task,
+      })
+      .catch((error: unknown) => {
+        console.error("[NegotiationRouter] Failed to publish TASK_ANNOUNCEMENT:", error);
+      });
 
     console.log(`[NegotiationRouter] Task announced: ${task.taskId} (${task.taskType})`);
 
@@ -112,21 +124,21 @@ export class NegotiationRouter {
   private handleTaskBid(event: Event): void {
     const bid = event.payload as Bid;
 
-    const negotiation = this.pendingNegotiations.get(bid.agentId);
+    const negotiation = this.pendingNegotiations.get(bid.taskId);
     if (!negotiation) {
-      console.warn(`[NegotiationRouter] Bid for unknown task: ${bid.agentId}`);
+      console.warn(`[NegotiationRouter] Bid for unknown task: ${bid.taskId}`);
       return;
     }
 
     // Check if task still accepts bids
     if (Date.now() > negotiation.deadline) {
-      console.warn(`[NegotiationRouter] Bid received after deadline: ${bid.agentId}`);
+      console.warn(`[NegotiationRouter] Bid received after deadline: ${bid.taskId}`);
       return;
     }
 
     // Check if agent has required capabilities
     const required = negotiation.announcement.requiredCapabilities;
-    const hasCapabilities = required.every(cap => bid.capabilities.includes(cap));
+    const hasCapabilities = required.every((cap) => bid.capabilities.includes(cap));
 
     if (!hasCapabilities) {
       console.warn(`[NegotiationRouter] Agent ${bid.agentId} missing required capabilities`);
@@ -134,12 +146,12 @@ export class NegotiationRouter {
     }
 
     // Calculate bid score (lower is better)
-    const loadWeight = 0.5;  // 50% weight on load
-    const timeWeight = 0.3;   // 30% weight on estimated time
+    const loadWeight = 0.5; // 50% weight on load
+    const timeWeight = 0.3; // 30% weight on estimated time
     const randomWeight = 0.2; // 20% randomness
 
     const loadScore = bid.currentLoad * loadWeight;
-    const timeScore = (bid.estimatedTimeMs / 10000) * timeWeight;  // Normalize to 0-1
+    const timeScore = (bid.estimatedTimeMs / 10000) * timeWeight; // Normalize to 0-1
     const randomScore = Math.random() * randomWeight;
 
     bid.bidScore = loadScore + timeScore + randomScore;
@@ -147,7 +159,9 @@ export class NegotiationRouter {
     // Store bid
     negotiation.bids.set(bid.agentId, bid);
 
-    console.log(`[NegotiationRouter] Bid received: ${bid.agentId} (score: ${bid.bidScore.toFixed(3)})`);
+    console.log(
+      `[NegotiationRouter] Bid received: ${bid.agentId} (score: ${bid.bidScore.toFixed(3)})`,
+    );
   }
 
   /**
@@ -176,15 +190,19 @@ export class NegotiationRouter {
     if (!bestBid) {
       console.error(`[NegotiationRouter] No bids for task: ${taskId}`);
 
-      this.eventBus.publish({
-        type: 'TASK_NEGOTIATION_FAILED',
-        sourceAgent: 'NegotiationRouter',
-        payload: {
-          taskId,
-          reason: 'no_bids',
-          announcement: negotiation.announcement,
-        },
-      });
+      void this.eventBus
+        .publish({
+          type: "TASK_NEGOTIATION_FAILED",
+          sourceAgent: "NegotiationRouter",
+          payload: {
+            taskId,
+            reason: "no_bids",
+            announcement: negotiation.announcement,
+          },
+        })
+        .catch((error: unknown) => {
+          console.error("[NegotiationRouter] Failed to publish TASK_NEGOTIATION_FAILED:", error);
+        });
 
       this.pendingNegotiations.delete(taskId);
       return;
@@ -198,13 +216,19 @@ export class NegotiationRouter {
       timestamp: Date.now(),
     };
 
-    this.eventBus.publish({
-      type: 'TASK_ASSIGNED',
-      sourceAgent: 'NegotiationRouter',
-      payload: assignment,
-    });
+    void this.eventBus
+      .publish({
+        type: "TASK_ASSIGNED",
+        sourceAgent: "NegotiationRouter",
+        payload: assignment,
+      })
+      .catch((error: unknown) => {
+        console.error("[NegotiationRouter] Failed to publish TASK_ASSIGNED:", error);
+      });
 
-    console.log(`[NegotiationRouter] Task ${taskId} assigned to ${bestBid.agentId} (score: ${bestBid.bidScore.toFixed(3)})`);
+    console.log(
+      `[NegotiationRouter] Task ${taskId} assigned to ${bestBid.agentId} (score: ${bestBid.bidScore.toFixed(3)})`,
+    );
 
     // Remove from pending
     this.pendingNegotiations.delete(taskId);
@@ -241,11 +265,15 @@ export class NegotiationRouter {
 
     this.pendingNegotiations.delete(taskId);
 
-    this.eventBus.publish({
-      type: 'TASK_NEGOTIATION_CANCELLED',
-      sourceAgent: 'NegotiationRouter',
-      payload: { taskId },
-    });
+    void this.eventBus
+      .publish({
+        type: "TASK_NEGOTIATION_CANCELLED",
+        sourceAgent: "NegotiationRouter",
+        payload: { taskId },
+      })
+      .catch((error: unknown) => {
+        console.error("[NegotiationRouter] Failed to publish TASK_NEGOTIATION_CANCELLED:", error);
+      });
 
     console.log(`[NegotiationRouter] Negotiation cancelled: ${taskId}`);
   }
@@ -254,7 +282,7 @@ export class NegotiationRouter {
    * Start negotiation router
    */
   start(): void {
-    console.log('[NegotiationRouter] Started');
+    console.log("[NegotiationRouter] Started");
   }
 
   /**
@@ -266,6 +294,6 @@ export class NegotiationRouter {
       this.cancelNegotiation(taskId);
     }
 
-    console.log('[NegotiationRouter] Stopped');
+    console.log("[NegotiationRouter] Stopped");
   }
 }

@@ -2,7 +2,7 @@
   "name": "@openclaw/slack",
   "version": "2026.3.2",
   "private": true,
-  "description": "OpenClaw Slack channel plugin",
+  "description": "HiveMind Slack channel plugin",
   "type": "module",
   "openclaw": {
     "extensions": [
