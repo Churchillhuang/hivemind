@@ -41,14 +41,22 @@ export class SimpleNegotiationRouter {
     }
   >;
   private running: boolean = false;
+  private unsubscribeBid?: () => void;
+  private readonly bidHandler: (event: Event) => void;
 
   constructor(config: HiveConfig, eventBus: EventBus) {
     this.config = config;
     this.eventBus = eventBus;
     this.activeNegotiations = new Map();
+    this.bidHandler = this.handleBid.bind(this);
 
-    // 订阅 bid 事件
-    this.eventBus.subscribe("SIMPLE_BID", this.handleBid.bind(this));
+    this.ensureBidSubscription();
+  }
+
+  private ensureBidSubscription(): void {
+    if (!this.unsubscribeBid) {
+      this.unsubscribeBid = this.eventBus.subscribe("SIMPLE_BID", this.bidHandler);
+    }
   }
 
   /**
@@ -261,6 +269,7 @@ export class SimpleNegotiationRouter {
       return;
     }
 
+    this.ensureBidSubscription();
     this.running = true;
     console.log("[SimpleRouter] Started");
   }
@@ -269,12 +278,16 @@ export class SimpleNegotiationRouter {
    * 停止
    */
   stop(): void {
-    if (!this.running) {
+    if (!this.running && !this.unsubscribeBid) {
       return;
     }
 
     this.running = false;
     this.activeNegotiations.clear();
+    if (this.unsubscribeBid) {
+      this.unsubscribeBid();
+      this.unsubscribeBid = undefined;
+    }
     console.log("[SimpleRouter] Stopped");
   }
 

@@ -537,5 +537,54 @@ describe("MemoryGateway - File I/O Coordination", () => {
       expect(response?.payload.content).toBe("");
       expect(response?.payload.source).toBe("file");
     });
+
+    it("should reject write paths that escape workspace", async () => {
+      const writeRequest: MemoryWriteRequest = {
+        file: "../outside.txt",
+        content: "blocked",
+        requestId: "escape-write",
+        operation: "write",
+      };
+
+      await eventBus.publish({
+        type: "MEMORY_WRITE_REQUEST",
+        sourceAgent: "test",
+        payload: writeRequest,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      const history = eventBus.getHistory();
+      const response = findResponseByRequestId(history, "MEMORY_WRITE_RESPONSE", "escape-write");
+      expect(response).toBeDefined();
+      const payload = response ? getPayloadRecord(response) : null;
+      expect(payload?.success).toBe(false);
+      expect(typeof payload?.error).toBe("string");
+      expect(String(payload?.error)).toContain("Path escapes workspace");
+    });
+
+    it("should reject read paths that escape workspace", async () => {
+      const readRequest: MemoryReadRequest = {
+        file: "../outside.txt",
+        requestId: "escape-read",
+      };
+
+      await eventBus.publish({
+        type: "MEMORY_READ_REQUEST",
+        sourceAgent: "test",
+        payload: readRequest,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      const history = eventBus.getHistory();
+      const response = findResponseByRequestId(history, "MEMORY_READ_RESPONSE", "escape-read");
+      expect(response).toBeDefined();
+      const payload = response ? getPayloadRecord(response) : null;
+      expect(payload?.content).toBeNull();
+      expect(payload?.source).toBe("error");
+      expect(typeof payload?.error).toBe("string");
+      expect(String(payload?.error)).toContain("Path escapes workspace");
+    });
   });
 });

@@ -55,27 +55,27 @@ Functional Agents (Dynamic)
 
 **Core Components (20 Total)**
 
-| Category | Components |
-|----------|------------|
-| Event System | EventBus, GlobalStateMachine |
-| Coordination | AdvancedRouter, AgentCommunication |
-| Evolution | DynamicAgentEvolution, SkillEnhancement, MemoryEnhancement |
-| Optimization | MetricsTracker, AnalysisEngine, AutonomousTuner |
-| Observation | EmergenceMonitor, CollaborationAnalyzer, ContinuityAnalyzer |
-| Integration | HiveGatewayBridge, SessionManager, GatewayIntegrator, ToolsManager |
-| System Agents | Orchestrator, InterfaceAgent, MemoryAgent, ReflectionAgent |
-| Factory | AgentFactory |
+| Category      | Components                                                         |
+| ------------- | ------------------------------------------------------------------ |
+| Event System  | EventBus, GlobalStateMachine                                       |
+| Coordination  | AdvancedRouter, AgentCommunication                                 |
+| Evolution     | DynamicAgentEvolution, SkillEnhancement, MemoryEnhancement         |
+| Optimization  | MetricsTracker, AnalysisEngine, AutonomousTuner                    |
+| Observation   | EmergenceMonitor, CollaborationAnalyzer, ContinuityAnalyzer        |
+| Integration   | HiveGatewayBridge, SessionManager, GatewayIntegrator, ToolsManager |
+| System Agents | Orchestrator, InterfaceAgent, MemoryAgent, ReflectionAgent         |
+| Factory       | AgentFactory                                                       |
 
 ### Emergent Self Features
 
 The system implements tracking for emergent properties:
 
-| Feature | Implementation |
-|---------|----------------|
-| **Continuity** | Shared memory and state snapshots |
-| **Agency** | Agent ID management and autonomous actions |
-| **Reflection** | Self-evaluation and skill learning |
-| **Intentionality** | Goal-setting and planning (partial) |
+| Feature            | Implementation                             |
+| ------------------ | ------------------------------------------ |
+| **Continuity**     | Shared memory and state snapshots          |
+| **Agency**         | Agent ID management and autonomous actions |
+| **Reflection**     | Self-evaluation and skill learning         |
+| **Intentionality** | Goal-setting and planning (partial)        |
 
 **Note:** These are mechanisms. Whether they produce anything resembling "consciousness" is an empirical question - only running the system over time will tell.
 
@@ -83,24 +83,25 @@ The system implements tracking for emergent properties:
 
 **Memory (default enabled):** All agents except Orchestrator use memory by default
 
-| Tier | Content | Used By | Purpose |
-|------|---------|---------|---------|
-| **L0** | None | Orchestrator | No memory for fast routing |
-| **L1** | Session | Interface | Recent conversation |
-| **L2** | Task | Functional Agents | Current task context |
-| **L3** | Knowledge | Memory Agent | Full knowledge base |
-| **L4** | Sample | Reflection Agent | Memory samples for self-reflection |
+| Tier   | Content   | Used By           | Purpose                            |
+| ------ | --------- | ----------------- | ---------------------------------- |
+| **L0** | None      | Orchestrator      | No memory for fast routing         |
+| **L1** | Session   | Interface         | Recent conversation                |
+| **L2** | Task      | Functional Agents | Current task context               |
+| **L3** | Knowledge | Memory Agent      | Full knowledge base                |
+| **L4** | Sample    | Reflection Agent  | Memory samples for self-reflection |
 
 **Model configuration (default uses 3 tiers):** Not all tiers used by default
 
-| Tier | Model Size | Used By | Notes |
-|------|-----------|---------|-------|
-| **Nano** | ≤1B | MemoryAgent | Default |
-| **Light** | 3-7B | Orchestrator, Functional | Default |
-| **Standard** | 8-30B | Interface, Reflection | Default |
-| **Heavy** | ≥70B | — | Not used (optional) |
+| Tier         | Model Size | Used By                  | Notes               |
+| ------------ | ---------- | ------------------------ | ------------------- |
+| **Nano**     | ≤1B        | MemoryAgent              | Default             |
+| **Light**    | 3-7B       | Orchestrator, Functional | Default             |
+| **Standard** | 8-30B      | Interface, Reflection    | Default             |
+| **Heavy**    | ≥70B       | —                        | Not used (optional) |
 
 **Important:** Memory and models are independent configurations:
+
 - You can use L0 memory with a Standard model
 - You can use L4 memory with a Nano model
 - Configure them separately
@@ -139,16 +140,16 @@ The system implements tracking for emergent properties:
 
 ## Implementation Status
 
-| Phase | Status | Components |
-|-------|--------|-----------|
-| **0.5** | ✅ Base framework landed | 2 |
-| **1** | ✅ Core Hive prototype | 10 |
-| **2** | ⚠️ Integration in progress | 4 |
-| **3** | ⚠️ Prototype only | 3 |
-| **4** | ⚠️ Prototype only | 3 |
-| **5** | ⚠️ Prototype only | 3 |
-| **6** | ⏳ Pending | 3 |
-| **Total** | **prototype coverage** | **20** |
+| Phase     | Status                     | Components |
+| --------- | -------------------------- | ---------- |
+| **0.5**   | ✅ Base framework landed   | 2          |
+| **1**     | ✅ Core Hive prototype     | 10         |
+| **2**     | ⚠️ Integration in progress | 4          |
+| **3**     | ⚠️ Prototype only          | 3          |
+| **4**     | ⚠️ Prototype only          | 3          |
+| **5**     | ⚠️ Prototype only          | 3          |
+| **6**     | ⏳ Pending                 | 3          |
+| **Total** | **prototype coverage**     | **20**     |
 
 ### Implementation
 
@@ -202,14 +203,14 @@ hivemind test
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [README](README.md) | This file |
-| [DEPLOY.md](DEPLOY.md) | Deployment guide |
+| Document                                             | Description                   |
+| ---------------------------------------------------- | ----------------------------- |
+| [README](README.md)                                  | This file                     |
+| [DEPLOY.md](DEPLOY.md)                               | Deployment guide              |
 | [HIVE_AGENT_DESIGN_EN](docs/HIVE_AGENT_DESIGN_EN.md) | Architecture design (English) |
-| [HIVE_AGENT_DESIGN_ZH](docs/HIVE_AGENT_DESIGN.md) | 架构设计 (中文) |
-| [ROADMAP.md](docs/ROADMAP.md) | Implementation roadmap |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+| [HIVE_AGENT_DESIGN_ZH](docs/HIVE_AGENT_DESIGN.md)    | Architecture design (Chinese) |
+| [ROADMAP.md](docs/ROADMAP.md)                        | Implementation roadmap        |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                   | Contribution guidelines       |
 
 ---
 
@@ -219,7 +220,7 @@ hivemind test
 
 Does continuous self emerge from agent coordination, or must it be designed?
 
-This system implements coordination mechanisms and provides observation tools. Whether consciousness actually emerges depends on运行结果。
+This system implements coordination mechanisms and provides observation tools. Whether consciousness actually emerges depends on runtime behavior.
 
 ### What "Emergence" Would Look Like
 
@@ -237,9 +238,10 @@ These are implemented, but whether they constitute "consciousness" requires care
 ## Tech Stack
 
 - **Language:** TypeScript
-- **Runtime:** Node.js 18+
+- **Runtime:** Node.js 22+
 - **Base:** [OpenClaw](https://github.com/openclaw/openclaw)
 - **Testing:** tsx, custom test suites
+- **Author:** Churchill Huang
 
 ---
 

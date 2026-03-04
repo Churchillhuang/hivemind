@@ -11,25 +11,25 @@
  * - Error handling: Retries failed writes with exponential backoff
  */
 
-import { BaseAgent } from '../core/Agent.js';
-import { randomUUID } from 'node:crypto';
-import { Event, EventType } from '../events/Event.js';
-import { EventBus } from '../events/EventBus.js';
-import type { HiveConfig } from '../hive/HiveConfig.js';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { promises as fs } from "fs";
+import { randomUUID } from "node:crypto";
+import path from "path";
+import { BaseAgent } from "../core/Agent.js";
+import { Event, EventType } from "../events/Event.js";
+import { EventBus } from "../events/EventBus.js";
+import type { HiveConfig } from "../hive/HiveConfig.js";
 
 /**
  * MemoryWriteRequest - Write request payload
  */
 export interface MemoryWriteRequest {
-  file: string;          // Relative path from workspace root (e.g. "MEMORY.md", "IDENTITY.md")
+  file: string; // Relative path from workspace root (e.g. "MEMORY.md", "IDENTITY.md")
   content: string;
   requestId: string;
-  operation: 'write' | 'append';
+  operation: "write" | "append";
   options?: {
-    atomic?: boolean;    // Use atomic write (default: true)
-    retry?: number;      // Retry count (default: 3)
+    atomic?: boolean; // Use atomic write (default: true)
+    retry?: number; // Retry count (default: 3)
   };
 }
 
@@ -65,7 +65,7 @@ export interface MemoryReadResponse {
   file: string;
   content: string | null;
   error?: string;
-  source: 'cache' | 'file' | 'error';
+  source: "cache" | "file" | "error";
 }
 
 /**
@@ -94,17 +94,39 @@ export class MemoryGateway extends BaseAgent {
   // Retry delay (exponential backoff base)
   private readonly RETRY_DELAY_BASE = 100;
 
+  private resolveWorkspacePath(file: string): string {
+    const workspacePath = this.hiveConfig.memory?.indexing.workspacePath || "";
+    if (!workspacePath) {
+      throw new Error("Memory workspace path is not configured");
+    }
+
+    const workspaceRoot = path.resolve(workspacePath);
+    const fullPath = path.resolve(workspaceRoot, file);
+    const relative = path.relative(workspaceRoot, fullPath);
+    const escapesWorkspace =
+      relative.startsWith("..") || path.isAbsolute(relative) || relative.includes("\0");
+
+    if (escapesWorkspace) {
+      throw new Error(`Path escapes workspace: ${file}`);
+    }
+
+    return fullPath;
+  }
+
   constructor(
     config: { id: string; role: string; description?: string },
     hiveConfig: HiveConfig,
     eventBus?: EventBus,
   ) {
-    super({
-      id: config.id,
-      role: config.role,
-      type: 'system',
-      description: config.description,
-    }, eventBus);
+    super(
+      {
+        id: config.id,
+        role: config.role,
+        type: "system",
+        description: config.description,
+      },
+      eventBus,
+    );
 
     this.hiveConfig = hiveConfig;
   }
@@ -117,8 +139,8 @@ export class MemoryGateway extends BaseAgent {
     this.running = true;
 
     // Subscribe to memory events
-    this.subscribeTo('MEMORY_WRITE_REQUEST');
-    this.subscribeTo('MEMORY_READ_REQUEST');
+    this.subscribeTo("MEMORY_WRITE_REQUEST");
+    this.subscribeTo("MEMORY_READ_REQUEST");
 
     // Start periodic cache cleanup
     this.cleanupInterval = setInterval(() => {
@@ -169,11 +191,11 @@ export class MemoryGateway extends BaseAgent {
 
   async handle(event: Event): Promise<void> {
     switch (event.type) {
-      case 'MEMORY_WRITE_REQUEST':
+      case "MEMORY_WRITE_REQUEST":
         await this.handleWriteRequest(event);
         break;
 
-      case 'MEMORY_READ_REQUEST':
+      case "MEMORY_READ_REQUEST":
         await this.handleReadRequest(event);
         break;
 
@@ -188,7 +210,9 @@ export class MemoryGateway extends BaseAgent {
   private async handleWriteRequest(event: Event): Promise<void> {
     const request = event.payload as MemoryWriteRequest;
 
-    console.log(`[MemoryGateway ${this.id}] Write request: ${request.file} (${request.content.length} bytes)`);
+    console.log(
+      `[MemoryGateway ${this.id}] Write request: ${request.file} (${request.content.length} bytes)`,
+    );
 
     try {
       // Queue the write
@@ -199,7 +223,7 @@ export class MemoryGateway extends BaseAgent {
 
       // Publish result
       await this.eventBus?.publish({
-        type: 'MEMORY_WRITE_RESPONSE',
+        type: "MEMORY_WRITE_RESPONSE",
         sourceAgent: this.id,
         payload: response,
       });
@@ -215,13 +239,14 @@ export class MemoryGateway extends BaseAgent {
         },
       });
 
-      console.log(`[MemoryGateway ${this.id}] Write completed: ${request.file} (${response.bytesWritten} bytes)`);
-
+      console.log(
+        `[MemoryGateway ${this.id}] Write completed: ${request.file} (${response.bytesWritten} bytes)`,
+      );
     } catch (error) {
       console.error(`[MemoryGateway ${this.id}] Write failed: ${request.file}`, error);
 
       await this.eventBus?.publish({
-        type: 'MEMORY_WRITE_RESPONSE',
+        type: "MEMORY_WRITE_RESPONSE",
         sourceAgent: this.id,
         payload: {
           requestId: request.requestId,
@@ -293,7 +318,6 @@ export class MemoryGateway extends BaseAgent {
             bytesWritten: request.content.length,
             writeTimeMs,
           };
-
         } catch (error) {
           if (attempt === retryCount) {
             throw error;
@@ -301,14 +325,15 @@ export class MemoryGateway extends BaseAgent {
 
           // Exponential backoff
           const delay = this.RETRY_DELAY_BASE * Math.pow(2, attempt);
-          console.warn(`[MemoryGateway ${this.id}] Write attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          console.warn(
+            `[MemoryGateway ${this.id}] Write attempt ${attempt + 1} failed, retrying in ${delay}ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
 
       // Should not reach here
-      throw new Error('Write failed after retries');
-
+      throw new Error("Write failed after retries");
     } finally {
       // Mark file as not processing
       this.isProcessing.set(request.file, false);
@@ -328,9 +353,7 @@ export class MemoryGateway extends BaseAgent {
         this.writeQueue.delete(requestId);
 
         // Process it
-        this.processWrite(queued.request)
-          .then(queued.resolve)
-          .catch(queued.reject);
+        this.processWrite(queued.request).then(queued.resolve).catch(queued.reject);
 
         return;
       }
@@ -340,19 +363,24 @@ export class MemoryGateway extends BaseAgent {
   /**
    * Atomic write: write to temp file + rename
    */
-  private async atomicWrite(file: string, content: string, operation: 'write'|'append'): Promise<void> {
-    const workspacePath = this.hiveConfig.memory?.indexing.workspacePath || '';
-    const fullPath = path.join(workspacePath, file);
+  private async atomicWrite(
+    file: string,
+    content: string,
+    operation: "write" | "append",
+  ): Promise<void> {
+    const fullPath = this.resolveWorkspacePath(file);
 
-    if (operation === 'append') {
+    if (operation === "append") {
       // For append, read existing, append, then atomic write
       const existing = await this.readFileDirect(file);
       content = existing + content;
     }
 
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+
     // Write to temp file
     const tmpFile = `${fullPath}.tmp.${Date.now()}.${randomUUID()}`;
-    await fs.writeFile(tmpFile, content, 'utf-8');
+    await fs.writeFile(tmpFile, content, "utf-8");
 
     // Atomic rename
     await fs.rename(tmpFile, fullPath);
@@ -363,14 +391,18 @@ export class MemoryGateway extends BaseAgent {
   /**
    * Direct write (without atomic rename)
    */
-  private async directWrite(file: string, content: string, operation: 'write'|'append'): Promise<void> {
-    const workspacePath = this.hiveConfig.memory?.indexing.workspacePath || '';
-    const fullPath = path.join(workspacePath, file);
+  private async directWrite(
+    file: string,
+    content: string,
+    operation: "write" | "append",
+  ): Promise<void> {
+    const fullPath = this.resolveWorkspacePath(file);
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
 
-    if (operation === 'append') {
-      await fs.appendFile(fullPath, content, 'utf-8');
+    if (operation === "append") {
+      await fs.appendFile(fullPath, content, "utf-8");
     } else {
-      await fs.writeFile(fullPath, content, 'utf-8');
+      await fs.writeFile(fullPath, content, "utf-8");
     }
 
     console.log(`[MemoryGateway ${this.id}] Direct write: ${file}`);
@@ -380,14 +412,13 @@ export class MemoryGateway extends BaseAgent {
    * Read file directly (no cache)
    */
   private async readFileDirect(file: string): Promise<string> {
-    const workspacePath = this.hiveConfig.memory?.indexing.workspacePath || '';
-    const fullPath = path.join(workspacePath, file);
+    const fullPath = this.resolveWorkspacePath(file);
 
     try {
-      return await fs.readFile(fullPath, 'utf-8');
+      return await fs.readFile(fullPath, "utf-8");
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return ''; // File doesn't exist, return empty string
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return ""; // File doesn't exist, return empty string
       }
       throw error;
     }
@@ -403,14 +434,14 @@ export class MemoryGateway extends BaseAgent {
 
     try {
       let content: string | null = null;
-      let source: 'cache' | 'file' | 'error' = 'error';
+      let source: "cache" | "file" | "error" = "error";
 
       // Check cache first
       try {
         const cached = this.readCache.get(request.file);
-        if (cached && (Date.now() - cached.timestamp < this.CACHE_TTL)) {
-          content =cached.content;
-          source = 'cache';
+        if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+          content = cached.content;
+          source = "cache";
           console.log(`[MemoryGateway ${this.id}] Cache hit: ${request.file}`);
         }
       } catch {}
@@ -418,7 +449,7 @@ export class MemoryGateway extends BaseAgent {
       // Cache miss, read from file
       if (content === null) {
         content = await this.readFileDirect(request.file);
-        source = 'file';
+        source = "file";
 
         // Update cache
         this.readCache.set(request.file, {
@@ -429,10 +460,10 @@ export class MemoryGateway extends BaseAgent {
 
       // Extract lines if requested
       if (request.options?.fromLine !== undefined) {
-        const lines = content.split('\n');
+        const lines = content.split("\n");
         const from = request.options.fromLine;
         const to = request.options.toLine ?? lines.length;
-        content = lines.slice(from, to).join('\n');
+        content = lines.slice(from, to).join("\n");
       }
 
       const response: MemoryReadResponse = {
@@ -443,23 +474,22 @@ export class MemoryGateway extends BaseAgent {
       };
 
       await this.eventBus?.publish({
-        type: 'MEMORY_READ_RESPONSE',
+        type: "MEMORY_READ_RESPONSE",
         sourceAgent: this.id,
         payload: response,
       });
-
     } catch (error) {
       console.error(`[MemoryGateway ${this.id}] Read failed: ${request.file}`, error);
 
       await this.eventBus?.publish({
-        type: 'MEMORY_READ_RESPONSE',
+        type: "MEMORY_READ_RESPONSE",
         sourceAgent: this.id,
         payload: {
           requestId: request.requestId,
           file: request.file,
           content: null,
           error: error instanceof Error ? error.message : String(error),
-          source: 'error',
+          source: "error",
         },
       });
     }
@@ -469,18 +499,29 @@ export class MemoryGateway extends BaseAgent {
    * Flush all pending writes
    */
   private async flushQueue(): Promise<void> {
-    const promises: Promise<void>[] = [];
+    const isAnyWriteInFlight = () => Array.from(this.isProcessing.values()).some(Boolean);
 
-    for (const queued of this.writeQueue.values()) {
-      promises.push(
-        this.processWrite(queued.request)
-          .then(queued.resolve)
-          .catch(queued.reject)
-      );
+    while (this.writeQueue.size > 0 || isAnyWriteInFlight()) {
+      if (this.writeQueue.size === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        continue;
+      }
+
+      const next = this.writeQueue.entries().next().value;
+      if (!next) {
+        continue;
+      }
+
+      const [requestId, queued] = next;
+      this.writeQueue.delete(requestId);
+
+      try {
+        const response = await this.queueWrite(queued.request);
+        queued.resolve(response);
+      } catch (error) {
+        queued.reject(error);
+      }
     }
-
-    await Promise.all(promises);
-    this.writeQueue.clear();
   }
 
   /**
@@ -520,7 +561,12 @@ export class MemoryGateway extends BaseAgent {
   getQueueStatus(): { queueSize: number; processing: Set<string> } {
     return {
       queueSize: this.writeQueue.size,
-      processing: new Set(this.isProcessing.entries().filter(([, v]) => v).map(([k]) => k)),
+      processing: new Set(
+        this.isProcessing
+          .entries()
+          .filter(([, v]) => v)
+          .map(([k]) => k),
+      ),
     };
   }
 }
