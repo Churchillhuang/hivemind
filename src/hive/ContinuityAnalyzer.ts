@@ -208,7 +208,7 @@ export class ContinuityAnalyzer {
    */
   modelIntents(agentId: string): IntentModel {
     const traces = this.emergenceMonitor.getEventTraces(agentId);
-    const intents = this.extractIntents(traces);
+    const intents = this.extractIntents(agentId, traces);
 
     const model = this.intentModels.get(agentId) || {
       agentId,
@@ -252,7 +252,10 @@ export class ContinuityAnalyzer {
   /**
    * 提取意图（简化）
    */
-  private extractIntents(traces: EventTrace[]): Array<{
+  private extractIntents(
+    agentId: string,
+    traces: EventTrace[],
+  ): Array<{
     intent: string;
     duration: number;
   }> {
@@ -270,7 +273,7 @@ export class ContinuityAnalyzer {
     }
 
     // 基于状态快照推断意图
-    const snapshots = this.emergenceMonitor.getStateSnapshots(undefined);
+    const snapshots = this.emergenceMonitor.getStateSnapshots(agentId);
     for (const snapshot of snapshots) {
       if (snapshot.properties.intent) {
         intents.push({

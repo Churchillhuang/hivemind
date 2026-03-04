@@ -21,6 +21,8 @@ enum SimpleRoutingMode {
 
 export interface SimpleRoutingDecision {
   taskId: string;
+  taskType: string;
+  description: string;
   targetAgent: string | null;
   routingMode: SimpleRoutingMode;
   reason: string;
@@ -130,6 +132,8 @@ export class SimpleOrchestrator extends BaseAgent {
       if (targetAgent) {
         return {
           taskId: task.taskId,
+          taskType: task.taskType,
+          description: task.description,
           targetAgent,
           routingMode: SimpleRoutingMode.DIRECT,
           reason: `Direct routing: ${task.taskType} → ${targetAgent}`,
@@ -140,6 +144,8 @@ export class SimpleOrchestrator extends BaseAgent {
     // 协商路由
     return {
       taskId: task.taskId,
+      taskType: task.taskType,
+      description: task.description,
       targetAgent: null, // 协商结果未知
       routingMode: SimpleRoutingMode.NEGOTIATED,
       reason: `Negotiated routing: ${task.taskType}`,
@@ -168,8 +174,8 @@ export class SimpleOrchestrator extends BaseAgent {
       if (this.negotiationRouter) {
         this.negotiationRouter.announceTask({
           taskId: decision.taskId,
-          taskType: "", // 将由其他机制填充
-          description: "", // 将由其他机制填充
+          taskType: decision.taskType,
+          description: decision.description,
           timestamp: Date.now(),
         });
 

@@ -287,7 +287,7 @@ export class MemoryEnhancement {
     const queryEmbedding = this.generateEmbedding(query);
 
     // 计算相似度
-    const results: Array<{ chunk: MemoryChunk; similarity: number }> = [];
+    const results: Array<{ chunk: MemoryChunk; similarity: number; relevanceScore: number }> = [];
 
     for (const [_chunkId, chunk] of this.chunks.entries()) {
       if (!chunk.embedding) {
@@ -296,12 +296,14 @@ export class MemoryEnhancement {
 
       const similarity = this.cosineSimilarity(queryEmbedding, chunk.embedding);
 
-      // 考虑重要性
-      results.push({ chunk, similarity });
+      const relevanceScore = similarity * 0.7 + chunk.importance * 0.3;
+      results.push({ chunk, similarity, relevanceScore });
     }
 
-    // 排序并取前 N
-    const topResults = results.toSorted((a, b) => b.similarity - a.similarity).slice(0, limit);
+    // 按相关性排序并取前 N
+    const topResults = results
+      .toSorted((a, b) => b.relevanceScore - a.relevanceScore || b.similarity - a.similarity)
+      .slice(0, limit);
 
     // 更新访问统计
     for (const result of topResults) {
@@ -315,7 +317,7 @@ export class MemoryEnhancement {
       chunkId: r.chunk.chunkId,
       content: r.chunk.content,
       similarity: r.similarity,
-      relevanceScore: r.similarity * 0.7 + r.chunk.importance * 0.3,
+      relevanceScore: r.relevanceScore,
     }));
   }
 

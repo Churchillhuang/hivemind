@@ -290,20 +290,26 @@ export class SessionManager {
    * 清理旧的 HiveMind session 数据
    */
   async cleanupHiveMindSessions(maxAgeMs: number): Promise<number> {
-    const sessions = await this.listSessions();
+    const store = await this.loadStore();
+    const sessions = Object.entries(store);
     const now = Date.now();
     let cleaned = 0;
 
-    for (const session of sessions) {
+    for (const [sessionKey, session] of sessions) {
       if (session.hiveMind && session.hiveMind.createdAt) {
         if (now - session.hiveMind.createdAt > maxAgeMs) {
           // 移除 HiveMind 数据
           const updated = { ...session };
           delete updated.hiveMind;
-          await this.setEntry(session.sessionId, updated);
+          store[sessionKey] = updated;
           cleaned++;
         }
       }
+    }
+
+    if (cleaned > 0) {
+      this.store = store;
+      await this.saveStore();
     }
 
     return cleaned;
