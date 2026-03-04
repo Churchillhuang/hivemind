@@ -311,9 +311,8 @@ export class Orchestrator extends BaseAgent {
     }
 
     await this.eventBus?.publish({
-      type: EventType.TASK_ASSIGNED,
+      type: EventType.TASK_CONFIRMED,
       sourceAgent: "Orchestrator",
-      routingMode: "negotiated",
       payload: {
         taskId: assignment.taskId,
         assignedTo: assignment.assignedTo,
