@@ -47,11 +47,16 @@ function resolveProviderConfig(
   );
 }
 
+/**
+ * Get the API key for a custom provider from the configuration.
+ * Supports both plaintext API keys and SecretRef (e.g., env variable references).
+ */
 export function getCustomProviderApiKey(
   cfg: OpenClawConfig | undefined,
   provider: string,
 ): string | undefined {
   const entry = resolveProviderConfig(cfg, provider);
+  // normalizeOptionalSecretInput handles both string and SecretRef types
   return normalizeOptionalSecretInput(entry?.apiKey);
 }
 
