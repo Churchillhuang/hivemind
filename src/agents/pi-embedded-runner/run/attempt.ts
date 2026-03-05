@@ -208,6 +208,45 @@ export function shouldInjectOllamaCompatNumCtx(params: {
   });
 }
 
+/**
+ * Fix for Cloudflare AI Gateway: convert message content arrays to strings.
+ * Cloudflare expects string content, but pi-ai sends arrays like ["text"].
+ */
+export function wrapStreamForCloudflareMessages(
+  baseFn: StreamFn | undefined,
+): StreamFn {
+  const streamFn = baseFn ?? streamSimple;
+  return (model, context, options) => {
+    // Check if this is a Cloudflare provider
+    const isCloudflare = model.provider?.includes("cloudflare") || 
+                        model.baseUrl?.includes("cloudflare.com");
+    
+    if (!isCloudflare || !context.messages) {
+      return streamFn(model, context, options);
+    }
+
+    // Normalize messages: convert content arrays to strings
+    const normalizedMessages = context.messages.map((msg: unknown) => {
+      if (!msg || typeof msg !== "object") {
+        return msg;
+      }
+      const typedMsg = msg as { role?: string; content?: unknown };
+      const content = typedMsg.content;
+      
+      // If content is an array, convert to string (for Cloudflare)
+      if (Array.isArray(content)) {
+        const textContent = content.find(item => typeof item === "string");
+        return { ...typedMsg, content: textContent ?? "" };
+      }
+      
+      return msg;
+    });
+
+    const normalizedContext = { ...context, messages: normalizedMessages };
+    return streamFn(model, normalizedContext, options);
+  };
+}
+
 export function wrapOllamaCompatNumCtx(baseFn: StreamFn | undefined, numCtx: number): StreamFn {
   const streamFn = baseFn ?? streamSimple;
   return (model, context, options) =>
@@ -1004,8 +1043,16 @@ export async function runEmbeddedAttempt(
           activeSession.agent.streamFn = streamSimple;
         }
       } else {
+        // Check if this is a Cloudflare provider and apply message normalization
+        const isCloudflareProvider = 
+          params.model.provider?.includes("cloudflare") || 
+          params.model.baseUrl?.includes("cloudflare.com");
+        
         // Force a stable streamFn reference so vitest can reliably mock @mariozechner/pi-ai.
-        activeSession.agent.streamFn = streamSimple;
+        const baseStreamFn = streamSimple;
+        activeSession.agent.streamFn = isCloudflareProvider
+          ? wrapStreamForCloudflareMessages(baseStreamFn)
+          : baseStreamFn;
       }
 
       // Ollama with OpenAI-compatible API needs num_ctx in payload.options.
