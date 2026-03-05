@@ -250,32 +250,32 @@ export function wrapStreamForCloudflareMessages(
       ...options,
       // Process responses: convert string content to array
       onChunk: (chunk: unknown) => {
-        options?.onChunk?.(chunk);
-        
-        if (!chunk || typeof chunk !== "object") {
-          return;
-        }
-        
-        const chunkRecord = chunk as Record<string, unknown>;
-        
-        // Convert messages with string content to array format
-        const messages = chunkRecord.messages;
-        if (Array.isArray(messages)) {
-          for (const msg of messages) {
-            if (!msg || typeof msg !== "object") continue;
-            
-            const typedMsg = msg as { role: string; content?: unknown };
-            if (typedMsg.role !== "assistant") continue;
-            
-            const content = typedMsg.content;
-            // If content is a string, convert to array format
-            if (typeof content === "string") {
-              (msg as Record<string, unknown>).content = [
-                { type: "text", text: content }
-              ];
+        // First: process the chunk - convert string content to array format
+        if (chunk && typeof chunk === "object") {
+          const chunkRecord = chunk as Record<string, unknown>;
+          
+          // Convert messages with string content to array format
+          const messages = chunkRecord.messages;
+          if (Array.isArray(messages)) {
+            for (const msg of messages) {
+              if (!msg || typeof msg !== "object") continue;
+              
+              const typedMsg = msg as { role: string; content?: unknown };
+              if (typedMsg.role !== "assistant") continue;
+              
+              const content = typedMsg.content;
+              // If content is a string, convert to array format
+              if (typeof content === "string") {
+                (msg as Record<string, unknown>).content = [
+                  { type: "text", text: content }
+                ];
+              }
             }
           }
         }
+        
+        // Then: call the original callback with the processed chunk
+        options?.onChunk?.(chunk);
       }
     });
   };
