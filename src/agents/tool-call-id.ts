@@ -45,6 +45,26 @@ export function extractToolCallsFromAssistant(
   msg: Extract<AgentMessage, { role: "assistant" }>,
 ): ToolCallLike[] {
   const content = msg.content;
+  
+  // Fix for Cloudflare AI Gateway: content can be string instead of array
+  if (typeof content === "string") {
+    try {
+      // Try to parse as JSON if it's a string
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        // Recursively call with parsed array
+        return extractToolCallsFromAssistant({
+          ...msg,
+          content: parsed,
+        });
+      }
+    } catch (e) {
+      // Not JSON, ignore
+    }
+    // No tool calls in plain text string
+    return [];
+  }
+
   if (!Array.isArray(content)) {
     return [];
   }

@@ -222,6 +222,13 @@ export function downgradeOpenAIReasoningBlocks(messages: AgentMessage[]): AgentM
     }
 
     const assistantMsg = msg as Extract<AgentMessage, { role: "assistant" }>;
+    
+    // Fix for Cloudflare AI Gateway: content can be string instead of array
+    if (typeof assistantMsg.content === "string") {
+      out.push(msg);
+      continue;
+    }
+    
     if (!Array.isArray(assistantMsg.content)) {
       out.push(msg);
       continue;
