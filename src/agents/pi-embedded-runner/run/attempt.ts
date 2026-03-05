@@ -210,7 +210,7 @@ export function shouldInjectOllamaCompatNumCtx(params: {
 
 /**
  * Fix for Cloudflare AI Gateway: convert message content arrays to strings.
- * Cloudflare expects string content, but pi-ai sends arrays like ["text"].
+ * Also converts Cloudflare responses with string content to array format.
  */
 export function wrapStreamForCloudflareMessages(
   baseFn: StreamFn | undefined,
@@ -221,12 +221,12 @@ export function wrapStreamForCloudflareMessages(
     const isCloudflare = model.provider?.includes("cloudflare") || 
                         model.baseUrl?.includes("cloudflare.com");
     
-    if (!isCloudflare || !context.messages) {
+    if (!isCloudflare) {
       return streamFn(model, context, options);
     }
 
-    // Normalize messages: convert content arrays to strings
-    const normalizedMessages = context.messages.map((msg: unknown) => {
+    // Normalize request messages: convert content arrays to strings
+    const normalizedMessages = context.messages?.map((msg: unknown) => {
       if (!msg || typeof msg !== "object") {
         return msg;
       }
@@ -242,8 +242,42 @@ export function wrapStreamForCloudflareMessages(
       return msg;
     });
 
-    const normalizedContext = { ...context, messages: normalizedMessages };
-    return streamFn(model, normalizedContext, options);
+    // Call the stream function with normalized messages
+    return streamFn(model, {
+      ...context,
+      messages: normalizedMessages ?? context.messages
+    }, {
+      ...options,
+      // Process responses: convert string content to array
+      onChunk: (chunk: unknown) => {
+        options?.onChunk?.(chunk);
+        
+        if (!chunk || typeof chunk !== "object") {
+          return;
+        }
+        
+        const chunkRecord = chunk as Record<string, unknown>;
+        
+        // Convert messages with string content to array format
+        const messages = chunkRecord.messages;
+        if (Array.isArray(messages)) {
+          for (const msg of messages) {
+            if (!msg || typeof msg !== "object") continue;
+            
+            const typedMsg = msg as { role: string; content?: unknown };
+            if (typedMsg.role !== "assistant") continue;
+            
+            const content = typedMsg.content;
+            // If content is a string, convert to array format
+            if (typeof content === "string") {
+              (msg as Record<string, unknown>).content = [
+                { type: "text", text: content }
+              ];
+            }
+          }
+        }
+      }
+    });
   };
 }
 
