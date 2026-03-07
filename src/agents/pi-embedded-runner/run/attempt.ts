@@ -212,18 +212,25 @@ export function shouldInjectOllamaCompatNumCtx(params: {
  * Fix for Cloudflare AI Gateway: convert message content arrays to strings.
  * Also converts Cloudflare responses with string content to array format.
  */
-export function wrapStreamForCloudflareMessages(
-  baseFn: StreamFn | undefined,
-): StreamFn {
+export function wrapStreamForCloudflareMessages(baseFn: StreamFn | undefined): StreamFn {
   const streamFn = baseFn ?? streamSimple;
   return (model, context, options) => {
     // Check if this is a Cloudflare provider
-    const isCloudflare = model.provider?.includes("cloudflare") || 
-                        model.baseUrl?.includes("cloudflare.com");
-    
+    // Supports: cloudflare.com, cloudflare-ai-gateway, custom providers with cloudflare base URLs
+    const isCloudflare =
+      model.provider?.includes("cloudflare") ||
+      model.baseUrl?.includes("cloudflare.com") ||
+      model.baseUrl?.includes("api.cloudflare.com") ||
+      model.baseUrl?.includes("gateway.ai.cloudflare.com");
+
     if (!isCloudflare) {
       return streamFn(model, context, options);
     }
+
+    // Debug log to confirm Cloudflare detection
+    console.log(
+      `[Cloudflare] Detected Cloudflare provider: provider=${model.provider}, baseUrl=${model.baseUrl}`,
+    );
 
     // Normalize request messages: convert content arrays to strings
     const normalizedMessages = context.messages?.map((msg: unknown) => {
@@ -232,52 +239,58 @@ export function wrapStreamForCloudflareMessages(
       }
       const typedMsg = msg as { role?: string; content?: unknown };
       const content = typedMsg.content;
-      
+
       // If content is an array, convert to string (for Cloudflare)
       if (Array.isArray(content)) {
-        const textContent = content.find(item => typeof item === "string");
+        const textContent = content.find((item) => typeof item === "string");
         return { ...typedMsg, content: textContent ?? "" };
       }
-      
+
       return msg;
     });
 
     // Call the stream function with normalized messages
-    return streamFn(model, {
-      ...context,
-      messages: normalizedMessages ?? context.messages
-    }, {
-      ...options,
-      // Process responses: convert string content to array
-      onChunk: (chunk: unknown) => {
-        // First: process the chunk - convert string content to array format
-        if (chunk && typeof chunk === "object") {
-          const chunkRecord = chunk as Record<string, unknown>;
-          
-          // Convert messages with string content to array format
-          const messages = chunkRecord.messages;
-          if (Array.isArray(messages)) {
-            for (const msg of messages) {
-              if (!msg || typeof msg !== "object") continue;
-              
-              const typedMsg = msg as { role: string; content?: unknown };
-              if (typedMsg.role !== "assistant") continue;
-              
-              const content = typedMsg.content;
-              // If content is a string, convert to array format
-              if (typeof content === "string") {
-                (msg as Record<string, unknown>).content = [
-                  { type: "text", text: content }
-                ];
+    return streamFn(
+      model,
+      {
+        ...context,
+        messages: normalizedMessages ?? context.messages,
+      },
+      {
+        ...options,
+        // Process responses: convert string content to array
+        onChunk: (chunk: unknown) => {
+          // First: process the chunk - convert string content to array format
+          if (chunk && typeof chunk === "object") {
+            const chunkRecord = chunk as Record<string, unknown>;
+
+            // Convert messages with string content to array format
+            const messages = chunkRecord.messages;
+            if (Array.isArray(messages)) {
+              for (const msg of messages) {
+                if (!msg || typeof msg !== "object") {
+                  continue;
+                }
+
+                const typedMsg = msg as { role: string; content?: unknown };
+                if (typedMsg.role !== "assistant") {
+                  continue;
+                }
+
+                const content = typedMsg.content;
+                // If content is a string, convert to array format
+                if (typeof content === "string") {
+                  (msg as Record<string, unknown>).content = [{ type: "text", text: content }];
+                }
               }
             }
           }
-        }
-        
-        // Then: call the original callback with the processed chunk
-        options?.onChunk?.(chunk);
-      }
-    });
+
+          // Then: call the original callback with the processed chunk
+          options?.onChunk?.(chunk);
+        },
+      },
+    );
   };
 }
 
@@ -1078,10 +1091,13 @@ export async function runEmbeddedAttempt(
         }
       } else {
         // Check if this is a Cloudflare provider and apply message normalization
-        const isCloudflareProvider = 
-          params.model.provider?.includes("cloudflare") || 
-          params.model.baseUrl?.includes("cloudflare.com");
-        
+        // Supports: cloudflare.com, cloudflare-ai-gateway, custom providers with cloudflare base URLs
+        const isCloudflareProvider =
+          params.model.provider?.includes("cloudflare") ||
+          params.model.baseUrl?.includes("cloudflare.com") ||
+          params.model.baseUrl?.includes("api.cloudflare.com") ||
+          params.model.baseUrl?.includes("gateway.ai.cloudflare.com");
+
         // Force a stable streamFn reference so vitest can reliably mock @mariozechner/pi-ai.
         const baseStreamFn = streamSimple;
         activeSession.agent.streamFn = isCloudflareProvider
