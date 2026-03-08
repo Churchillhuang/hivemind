@@ -7,23 +7,31 @@
  * - 可视化协商过程
  */
 
-import { NegotiationRouter, type Bid } from "./NegotiationRouter.js";
-import type { BidWithSkills } from "./SkillProfile.js";
+import { NegotiationRouter } from "./NegotiationRouter.js";
 
 export class SkillBasedNegotiationRouter extends NegotiationRouter {
   /**
    * 覆盖父类的 selectWinner 方法，添加技能评分权重
    */
-  protected selectWinner(taskId: string, bids: Bid[]): string | null {
+  protected selectWinner(taskId: string): void {
+    const negotiation = this.pendingNegotiations.get(taskId);
+    if (!negotiation) {
+      return;
+    }
+
+    // 从父类获取 bids
+    const bids = Array.from(negotiation.bids.values());
+
     if (bids.length === 0) {
-      return null;
+      // 调用父类的失败处理
+      super.selectWinner(taskId);
+      return;
     }
 
     // 按评分排序（评分越低越好）
     const sortedBids = [...bids].toSorted((a, b) => a.bidScore - b.bidScore);
 
     const bestBid = sortedBids[0];
-    const bestBidSkills = (bestBid as BidWithSkills).skillScores;
 
     console.log(`[NegotiationRouter] Selected winner for task ${taskId}:`);
     console.log(`  Agent: ${bestBid.agentId}`);
@@ -31,46 +39,23 @@ export class SkillBasedNegotiationRouter extends NegotiationRouter {
     console.log(`  Load: ${bestBid.currentLoad.toFixed(2)}`);
     console.log(`  Time: ${bestBid.estimatedTimeMs}ms`);
 
-    if (bestBidSkills && bestBidSkills.size > 0) {
-      console.log(`  Skills:`);
-      for (const [skill, score] of bestBidSkills.entries()) {
-        console.log(`    - ${skill}: ${score.toFixed(3)}`);
-      }
-    }
+    // 发布任务分配事件
+    void this.eventBus
+      .publish({
+        type: "TASK_ASSIGNED",
+        sourceAgent: "NegotiationRouter",
+        payload: {
+          taskId,
+          assignedTo: bestBid.agentId,
+          bidScore: bestBid.bidScore,
+          taskData: negotiation.announcement,
+        },
+      })
+      .catch((error: unknown) => {
+        console.error("[NegotiationRouter] Failed to publish TASK_ASSIGNED:", error);
+      });
 
-    if ((bestBid as BidWithSkills).isExploration) {
-      console.log(`  Mode: EXPLORATION (agent has no experience)`);
-    }
-
-    return bestBid.agentId;
-  }
-
-  /**
-   * 统计投标中的探索比例
-   * 用于监控系统的探索 vs 利用平衡
-   */
-  getExplorationStats(taskId: string): {
-    totalBids: number;
-    explorationBids: number;
-    explorationRatio: number;
-  } {
-    const status = this.getNegotiationStatus(taskId);
-    if (!status) {
-      return {
-        totalBids: 0,
-        explorationBids: 0,
-        explorationRatio: 0,
-      };
-    }
-
-    const bids = status.bids as BidWithSkills[];
-    const totalBids = bids.length;
-    const explorationBids = bids.filter((bid) => bid.isExploration).length;
-
-    return {
-      totalBids,
-      explorationBids,
-      explorationRatio: totalBids > 0 ? explorationBids / totalBids : 0,
-    };
+    // 清理谈判状态
+    this.pendingNegotiations.delete(taskId);
   }
 }

@@ -41,12 +41,12 @@ export interface TaskAssignment {
 }
 
 export class NegotiationRouter {
-  private eventBus: EventBus;
+  protected eventBus: EventBus;
   public config: HiveConfig;
-  private negotiationTimeout: number;
+  protected negotiationTimeout: number;
 
   // Current negotiations
-  private pendingNegotiations: Map<
+  protected pendingNegotiations: Map<
     string,
     {
       announcement: TaskAnnouncement;
@@ -95,6 +95,7 @@ export class NegotiationRouter {
       announcement: task,
       bids: new Map<string, Bid>(),
       deadline: Date.now() + this.negotiationTimeout,
+      timer: undefined as NodeJS.Timeout | undefined,
     };
 
     this.pendingNegotiations.set(task.taskId, negotiation);
@@ -167,7 +168,7 @@ export class NegotiationRouter {
   /**
    * Select winning agent
    */
-  private selectWinner(taskId: string): void {
+  protected selectWinner(taskId: string): void {
     const negotiation = this.pendingNegotiations.get(taskId);
     if (!negotiation) {
       return;

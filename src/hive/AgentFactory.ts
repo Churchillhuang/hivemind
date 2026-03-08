@@ -95,9 +95,14 @@ export class AgentFactory extends BaseAgent {
     this.running = true;
 
     // 订阅事件
-    this.subscribeTo(EventType.AGENT_CREATE_REQUEST);
-    this.subscribeTo(EventType.TASK_COMPLETED);
-    this.subscribeTo(EventType.TASK_FAILED);
+    this.subscribeTo("AGENT_CREATE_REQUEST");
+    this.subscribeTo("TASK_ANNOUNCEMENT");
+    this.subscribeTo("TASK_COMPLETED");
+    this.subscribeTo("TASK_FAILED");
+
+    // 初始化模板
+    this.initializeTemplates();
+    this.skillPersistence = new SkillPersistence(this.hiveConfig);
 
     await this.eventBus?.publish({
       type: EventType.AGENT_STARTED,
@@ -140,6 +145,9 @@ export class AgentFactory extends BaseAgent {
     switch (event.type) {
       case "AGENT_CREATE_REQUEST":
         await this.handleCreateRequest(event);
+        break;
+      case "TASK_ANNOUNCEMENT":
+        await this.handleTaskAnnouncement(event);
         break;
       case "TASK_COMPLETED":
       case "TASK_FAILED":
@@ -205,6 +213,140 @@ export class AgentFactory extends BaseAgent {
     console.log(
       `[AgentFactory ${this.id}] Templates initialized: ${this.templates.size} templates`,
     );
+  }
+
+  /**
+   * 处理任务公告 - 创建匹配的代理并让其投标
+   */
+  private async handleTaskAnnouncement(event: Event): Promise<void> {
+    const announcement = event.payload as {
+      taskId: string;
+      taskType: string;
+      requiredCapabilities: string[];
+      priority: "urgent" | "normal" | "low";
+      description: string;
+      timestamp: number;
+    };
+
+    console.log(
+      `[AgentFactory ${this.id}] Task announcement received: ${announcement.taskId} (${announcement.taskType})`,
+    );
+
+    // 1. 查找匹配的模板
+    const matchingTemplate = this.findMatchingTemplate(
+      announcement.taskType,
+      announcement.requiredCapabilities,
+    );
+
+    if (!matchingTemplate) {
+      console.log(
+        `[AgentFactory ${this.id}] No matching template for task type: ${announcement.taskType}`,
+      );
+      // 回退到通用助手
+      const generalTemplate = this.templates.get("general_assistant");
+      if (generalTemplate) {
+        await this.createAgentForTask(generalTemplate, announcement);
+      }
+      return;
+    }
+
+    // 2. 为任务创建代理
+    await this.createAgentForTask(matchingTemplate, announcement);
+  }
+
+  /**
+   * 查找匹配的模板
+   */
+  private findMatchingTemplate(
+    taskType: string,
+    requiredCapabilities: string[],
+  ): AgentTemplate | undefined {
+    // 首先按任务类型精确匹配
+    for (const template of this.templates.values()) {
+      if (
+        template.id.toLowerCase().includes(taskType.toLowerCase()) ||
+        template.name.toLowerCase().includes(taskType.toLowerCase())
+      ) {
+        return template;
+      }
+    }
+
+    // 然后按能力匹配
+    for (const template of this.templates.values()) {
+      const hasAllCapabilities = requiredCapabilities.every((cap) =>
+        template.capabilities.some((templateCap) =>
+          templateCap.toLowerCase().includes(cap.toLowerCase()),
+        ),
+      );
+
+      if (hasAllCapabilities) {
+        return template;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * 为任务创建代理并让其投标
+   */
+  private async createAgentForTask(template: AgentTemplate, announcement: unknown): Promise<void> {
+    const taskAnnouncement = announcement as {
+      taskId: string;
+      taskType: string;
+      requiredCapabilities: string[];
+      priority: "urgent" | "normal" | "low";
+      description: string;
+      timestamp: number;
+    };
+    const instanceId = `func_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    // 创建代理实例
+    const agentInstance: AgentInstance = {
+      ...template,
+      instanceId,
+      createdAt: Date.now(),
+      status: "creating",
+      performance: {
+        tasksCompleted: 0,
+        tasksFailed: 0,
+        avgProcessingTime: 0,
+      },
+    };
+
+    this.instances.set(instanceId, agentInstance);
+
+    console.log(
+      `[AgentFactory ${this.id}] Created agent ${instanceId} for task ${taskAnnouncement.taskId}`,
+    );
+
+    // 让新代理立即投标
+    await this.eventBus.publish({
+      type: "TASK_BID",
+      sourceAgent: instanceId,
+      payload: {
+        taskId: taskAnnouncement.taskId,
+        agentId: instanceId,
+        capabilities: template.capabilities,
+        estimatedTimeMs: 5000, // 默认5秒
+        currentLoad: 0, // 新代理负载为0
+        bidScore: 0.1, // 新代理有优势（低分优先）
+        timestamp: Date.now(),
+      },
+    });
+
+    // 发布代理创建事件
+    await this.eventBus.publish({
+      type: "AGENT_CREATED",
+      sourceAgent: this.id,
+      payload: {
+        agentId: instanceId,
+        templateId: template.id,
+        role: template.role,
+        taskId: taskAnnouncement.taskId,
+        capabilities: template.capabilities,
+      },
+    });
   }
 
   /**

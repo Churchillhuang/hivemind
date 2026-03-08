@@ -232,65 +232,50 @@ export function wrapStreamForCloudflareMessages(baseFn: StreamFn | undefined): S
       `[Cloudflare] Detected Cloudflare provider: provider=${model.provider}, baseUrl=${model.baseUrl}`,
     );
 
-    // Normalize request messages: convert content arrays to strings
-    const normalizedMessages = context.messages?.map((msg: unknown) => {
-      if (!msg || typeof msg !== "object") {
-        return msg;
-      }
-      const typedMsg = msg as { role?: string; content?: unknown };
-      const content = typedMsg.content;
+    // Call the stream function with original context
+    // Cloudflare Workers AI API accepts content in various formats
+    return streamFn(model, context, {
+      ...options,
+      // Process responses: convert string content to array format
+      onChunk: (chunk: unknown) => {
+        // Convert string content to array format for downstream processing
+        if (chunk && typeof chunk === "object") {
+          const chunkRecord = chunk as Record<string, unknown>;
+          const messages = chunkRecord.messages;
+          if (Array.isArray(messages)) {
+            for (const msg of messages) {
+              if (!msg || typeof msg !== "object") {
+                continue;
+              }
 
-      // If content is an array, convert to string (for Cloudflare)
-      if (Array.isArray(content)) {
-        const textContent = content.find((item) => typeof item === "string");
-        return { ...typedMsg, content: textContent ?? "" };
-      }
+              const typedMsg = msg as { role: string; content?: unknown };
+              if (typedMsg.role !== "assistant") {
+                continue;
+              }
 
-      return msg;
-    });
-
-    // Call the stream function with normalized messages
-    return streamFn(
-      model,
-      {
-        ...context,
-        messages: normalizedMessages ?? context.messages,
-      },
-      {
-        ...options,
-        // Process responses: convert string content to array
-        onChunk: (chunk: unknown) => {
-          // First: process the chunk - convert string content to array format
-          if (chunk && typeof chunk === "object") {
-            const chunkRecord = chunk as Record<string, unknown>;
-
-            // Convert messages with string content to array format
-            const messages = chunkRecord.messages;
-            if (Array.isArray(messages)) {
-              for (const msg of messages) {
-                if (!msg || typeof msg !== "object") {
-                  continue;
-                }
-
-                const typedMsg = msg as { role: string; content?: unknown };
-                if (typedMsg.role !== "assistant") {
-                  continue;
-                }
-
-                const content = typedMsg.content;
-                // If content is a string, convert to array format
-                if (typeof content === "string") {
-                  (msg as Record<string, unknown>).content = [{ type: "text", text: content }];
-                }
+              const content = typedMsg.content;
+              // If content is a string, convert to array format
+              if (typeof content === "string") {
+                (msg as Record<string, unknown>).content = [{ type: "text", text: content }];
+              } else if (
+                content !== null &&
+                content !== undefined &&
+                !Array.isArray(content) &&
+                typeof content === "object"
+              ) {
+                // Handle object content - convert to text block
+                (msg as Record<string, unknown>).content = [
+                  { type: "text", text: JSON.stringify(content) },
+                ];
               }
             }
           }
+        }
 
-          // Then: call the original callback with the processed chunk
-          options?.onChunk?.(chunk);
-        },
+        // Then: call the original callback with the processed chunk
+        options?.onChunk?.(chunk);
       },
-    );
+    });
   };
 }
 
