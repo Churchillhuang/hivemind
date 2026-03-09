@@ -196,9 +196,15 @@ export async function runGatewayLoop(params: {
         // instead of crashing. A crash here would respawn a new process that
         // loses macOS Full Disk Access (TCC permissions are PID-bound). (#35862)
         server = null;
+        // Release the gateway lock so that `daemon restart/stop` (which
+        // discovers PIDs via the gateway port) can still manage the process.
+        // Without this, the process holds the lock but is not listening,
+        // forcing manual cleanup. (#35862)
+        await releaseLockIfHeld();
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const errStack = err instanceof Error && err.stack ? `\n${err.stack}` : "";
         gatewayLog.error(
-          `gateway startup failed: ${err instanceof Error ? err.message : String(err)}. ` +
-            "Process will stay alive; fix the issue and restart.",
+          `gateway startup failed: ${errMsg}${errStack}. Process will stay alive; fix the issue and restart.`,
         );
       }
       await new Promise<void>((resolve) => {
