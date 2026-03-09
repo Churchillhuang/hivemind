@@ -1,0 +1,26 @@
+{
+  "id": "ckpt_1773008822440_a76f1ac92",
+  "timestamp": 1773008822441,
+  "state": "shutdown",
+  "stateHash": "734x4so",
+  "checksum": "111u",
+  "metadata": {
+    "activeAgents": [
+      "orchestrator_001",
+      "interface_agent_001",
+      "memory_agent_001",
+      "memory_gateway_001",
+      "reflection_agent_001",
+      "agent_factory_001"
+    ],
+    "pendingTasks": 2,
+    "completedTasks": 0,
+    "eventHistorySize": 28,
+    "generation": 0
+  },
+  "snapshots": {
+    "agents": "[\"orchestrator_001\",\"interface_agent_001\",\"memory_agent_001\",\"memory_gateway_001\",\"reflection_agent_001\",\"agent_factory_001\"]",
+    "tasks": "{\"pending\":2,\"completed\":0,\"failed\":0}",
+    "events": "[{\"id\":\"evt_1773008808417_0\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_gateway_001\",\"timestamp\":1773008808417},{\"id\":\"evt_1773008808418_1\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1773008808418},{\"id\":\"evt_1773008808419_2\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1773008808419},{\"id\":\"evt_1773008808420_3\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1773008808420},{\"id\":\"evt_1773008808420_4\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"reflection_agent_001\",\"timestamp\":1773008808420},{\"id\":\"evt_1773008808420_5\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"agent_factory_001\",\"timestamp\":1773008808420},{\"id\":\"evt_1773008808425_6\",\"type\":\"SYSTEM_START\",\"sourceAgent\":\"HiveManager\",\"timestamp\":1773008808425},{\"id\":\"evt_1773008808425_7\",\"type\":\"HIVE_BRIDGE_INITIALIZED\",\"sourceAgent\":\"HiveGatewayBridge\",\"timestamp\":1773008808425},{\"id\":\"evt_1773008808426_8\",\"type\":\"NEW_MESSAGE\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1773008808426,\"correlationId\":\"test_simple\"},{\"id\":\"evt_1773008808427_9\",\"type\":\"TASK_ASSIGNED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1773008808427},{\"id\":\"evt_1773008808427_10\",\"type\":\"MEMORY_QUERY\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1773008808427},{\"id\":\"evt_1773008808428_11\",\"type\":\"MEMORY_RESULT\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1773008808428},{\"id\":\"evt_1773008808428_12\",\"type\":\"MESSAGE_PROCESSED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1773008808428},{\"id\":\"evt_1773008809430_13\",\"type\":\"NEW_MESSAGE\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1773008809430,\"correlationId\":\"test_moderate\"},{\"id\":\"evt_1773008809430_14\",\"type\":\"TASK_ASSIGNED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1773008809430},{\"id\":\"evt_1773008809430_15\",\"type\":\"MEMORY_QUERY\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1773008809430},{\"id\":\"evt_1773008809430_16\",\"type\":\"MEMORY_RESULT\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1773008809430},{\"id\":\"evt_1773008809430_17\",\"type\":\"MESSAGE_PROCESSED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1773008809430},{\"id\":\"evt_1773008811432_18\",\"type\":\"TASK_REQUESTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1773008811432},{\"id\":\"evt_1773008811433_19\",\"type\":\"TASK_ANNOUNCEMENT\",\"sourceAgent\":\"NegotiationRouter\",\"timestamp\":1773008811433},{\"id\":\"evt_1773008811433_20\",\"type\":\"TASK_BID\",\"sourceAgent\":\"func_1773008811433_sbql64a\",\"timestamp\":1773008811433},{\"id\":\"evt_1773008811433_21\",\"type\":\"AGENT_CREATED\",\"sourceAgent\":\"agent_factory_001\",\"timestamp\":1773008811433},{\"id\":\"evt_1773008819435_22\",\"type\":\"TASK_ASSIGNED\",\"sourceAgent\":\"NegotiationRouter\",\"timestamp\":1773008819435},{\"id\":\"evt_1773008819435_23\",\"type\":\"TASK_ASSIGNED\",\"sourceAgent\":\"Orchestrator\",\"timestamp\":1773008819435},{\"id\":\"evt_1773008819436_24\",\"type\":\"TASK_REQUESTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1773008819436},{\"id\":\"evt_1773008819436_25\",\"type\":\"TASK_ANNOUNCEMENT\",\"sourceAgent\":\"NegotiationRouter\",\"timestamp\":1773008819436},{\"id\":\"evt_1773008819436_26\",\"type\":\"TASK_BID\",\"sourceAgent\":\"func_1773008819436_9npj3wi\",\"timestamp\":1773008819436},{\"id\":\"evt_1773008819436_27\",\"type\":\"AGENT_CREATED\",\"sourceAgent\":\"agent_factory_001\",\"timestamp\":1773008819436}]"
+  }
+}

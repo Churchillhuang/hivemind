@@ -429,9 +429,9 @@ export class HiveManager {
    * Bridge reuses the manager-owned InterfaceAgent to avoid duplicate listeners.
    */
   async ensureGatewayBridge(): Promise<HiveGatewayBridge> {
-    if (!this.initialized) {
-      throw new Error("HiveManager must be initialized before creating GatewayBridge");
-    }
+    // Note: We don't check this.initialized here because this method may be called
+    // during the initialization phase (via initializeGateway). What matters is that
+    // the InterfaceAgent is ready.
 
     if (!this.interfaceAgent) {
       throw new Error("InterfaceAgent is not available; cannot create GatewayBridge");

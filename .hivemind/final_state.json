@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "generation": 0,
+  "currentState": "shutdown",
+  "metadata": {
+    "activeAgents": [],
+    "pendingTasks": 0,
+    "completedTasks": 0,
+    "failedTasks": 0,
+    "startTime": 1773015188643,
+    "lastActivity": 1773015299697
+  },
+  "config": {
+    "maxCheckpoints": 10,
+    "checkpointInterval": 10000,
+    "enableRollback": true,
+    "enablePersistence": true
+  },
+  "lastTransition": {
+    "from": "idle",
+    "to": "shutdown",
+    "timestamp": 1773015299663,
+    "reason": "hive_manager_shutdown",
+    "agentId": "HiveManager"
+  }
+}

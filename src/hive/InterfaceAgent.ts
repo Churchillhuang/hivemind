@@ -2,14 +2,21 @@
  * Interface Agent - HiveMind 的对话 Agent
  *
  * 负责处理用户消息，与 Gateway 交互，通过 EventBus 协调其他 Agents
+ *
+ * 使用共识决策机制：
+ * - 收到任务后广播给所有Agent
+ * - 各Agent自主决定是否参与
+ * - 通过舞蹈、支持、撤回达成共识
+ * - 共识达成后执行任务
  */
 
 import { randomUUID } from "node:crypto";
-import { BaseAgent } from "../core/Agent.js";
 import { Event, EventType } from "../events/Event.js";
-import { EventBus, getGlobalEventBus } from "../events/EventBus.js";
+import { EventBus } from "../events/EventBus.js";
 import type { HiveConfig, MemoryLevel } from "../hive/HiveConfig.js";
 import { getAgentModelConfig } from "../utils/ModelConfig.js";
+import type { TaskAnnouncement, ConsensusReached, SkillMatch } from "./consensus-types.js";
+import { ConsensusAgent } from "./ConsensusAgent.js";
 import { LLMRuntime } from "./LLMRuntime.js";
 
 export interface Message {
@@ -29,8 +36,7 @@ export interface AgentResponse {
   metadata?: Record<string, unknown>;
 }
 
-export class InterfaceAgent extends BaseAgent {
-  private hiveConfig: HiveConfig;
+export class InterfaceAgent extends ConsensusAgent {
   private llmRuntime: LLMRuntime;
   private pendingRequests: Map<
     string,
@@ -63,14 +69,13 @@ export class InterfaceAgent extends BaseAgent {
         type: "system",
         description: config.description,
       },
+      hiveConfig,
       eventBus,
     );
 
-    this.hiveConfig = hiveConfig;
     this.llmRuntime = new LLMRuntime(hiveConfig);
-    this.eventBus = eventBus || getGlobalEventBus();
 
-    // 订阅事件
+    // 订阅事件（ConsensusAgent已经在start()中订阅了共识相关事件）
     this.subscribeTo(EventType.TASK_ASSIGNED);
     this.subscribeTo(EventType.MESSAGE_PROCESSED);
     this.subscribeTo(EventType.MEMORY_RESULT);
@@ -124,6 +129,10 @@ export class InterfaceAgent extends BaseAgent {
   }
 
   async handle(event: Event): Promise<void> {
+    // 先让 ConsensusAgent 处理共识相关事件
+    await super.handle(event);
+
+    // 然后处理 InterfaceAgent 特有的事件
     switch (event.type) {
       case "TASK_ASSIGNED":
         await this.handleTaskAssigned(event);
@@ -183,35 +192,64 @@ export class InterfaceAgent extends BaseAgent {
   }
 
   private async handleNewMessage(message: Message, correlationId?: string): Promise<void> {
-    console.log(`[InterfaceAgent ${this.id}] Processing message:`, message);
+    console.log(
+      `[InterfaceAgent ${this.id}] Processing message (brainstem - not participating in consensus)`,
+    );
 
     try {
-      // MVP: 不检查 sourceAgent，让所有消息都能被处理
-      // 这样 Orchestrator 可以路由消息给它
-      // 后期可以添加更智能的循环检测
-
-      // 请求记忆（可选）
-      const memory = await this.requestMemory(message.content.substring(0, 50));
-
-      // 生成响应
-      const content = await this.generateResponse(message, memory);
-
-      // 发布响应
-      const response: AgentResponse = {
-        messageId: message.id,
-        content,
-        agentId: this.id,
+      // 1. 广播任务公告，让功能Agent参与共识决策
+      const taskAnnouncement: TaskAnnouncement = {
+        taskId: `task_${Date.now()}_${randomUUID().substring(0, 8)}`,
+        taskType: "message",
+        requiredCapabilities: this.determineRequiredCapabilities(message.content),
+        priority: "normal",
+        description: message.content.substring(0, 200),
         timestamp: Date.now(),
+        payload: { message },
       };
 
+      console.log(
+        `[InterfaceAgent ${this.id}] Broadcasting task announcement: ${taskAnnouncement.taskId}`,
+      );
+      console.log(
+        `[InterfaceAgent ${this.id}] Waiting for functional agents to reach consensus...`,
+      );
+
       await this.eventBus.publish({
-        type: EventType.MESSAGE_PROCESSED,
+        type: "TASK_ANNOUNCEMENT",
         sourceAgent: this.id,
-        payload: response,
-        correlationId,
+        payload: taskAnnouncement,
       });
 
-      console.log(`[InterfaceAgent ${this.id}] Response published:`, content);
+      // 2. InterfaceAgent 是脑干，不参与共识，只等待结果
+      // 等待共识达成（或超时后由脑干直接处理）
+      const consensus = await this.waitForConsensus(taskAnnouncement.taskId, 10000);
+
+      if (consensus) {
+        console.log(`[InterfaceAgent ${this.id}] Consensus reached by functional agents:`);
+        console.log(`  Action: ${consensus.action}`);
+        console.log(`  Assigned to: ${consensus.assignedAgent}`);
+
+        if (consensus.action === "direct" && consensus.assignedAgent) {
+          // 功能Agent被选中，等待它执行并返回结果
+          // 结果会通过 MESSAGE_PROCESSED 事件返回
+          console.log(
+            `[InterfaceAgent ${this.id}] Waiting for ${consensus.assignedAgent} to execute...`,
+          );
+        } else if (consensus.action === "decompose") {
+          console.log(
+            `[InterfaceAgent ${this.id}] Task will be decomposed and handled by multiple agents`,
+          );
+        }
+      } else {
+        // 没有功能Agent参与共识，脑干直接处理（反射）
+        console.log(
+          `[InterfaceAgent ${this.id}] No consensus (brainstem reflex), handling directly`,
+        );
+        const memory = await this.requestMemory(message.content.substring(0, 50));
+        const content = await this.generateResponse(message, memory);
+        await this.publishResponse(message, content, correlationId);
+      }
     } catch (error) {
       console.error(`[InterfaceAgent ${this.id}] Error processing message:`, error);
 
@@ -219,11 +257,118 @@ export class InterfaceAgent extends BaseAgent {
         type: EventType.AGENT_ERROR,
         sourceAgent: this.id,
         payload: {
-          message: "Failed to process message",
           error: error instanceof Error ? error.message : String(error),
+          messageId: message.id,
         },
+        correlationId,
       });
     }
+  }
+
+  /**
+   * InterfaceAgent 特有的任务评估逻辑
+   */
+  private evaluateTaskAsInterfaceAgent(task: TaskAnnouncement): SkillMatch {
+    const message = (task.payload as { message?: Message })?.message;
+    if (!message) {
+      return { score: 0.3, matchedSkills: [], reasoning: "No message payload" };
+    }
+
+    // 基于历史经验评估
+    let score = 0.5; // 基础分数
+    const matchedSkills: string[] = [];
+
+    // 检查是否有处理过类似任务
+    const content = message.content.toLowerCase();
+
+    // 简单任务倾向
+    if (content.length < 50) {
+      score += 0.2;
+      matchedSkills.push("simple_response");
+    }
+
+    // 对话类任务
+    if (content.includes("你好") || content.includes("hello") || content.includes("hi")) {
+      score += 0.3;
+      matchedSkills.push("greeting");
+    }
+
+    // 问题回答
+    if (content.includes("?") || content.includes("？")) {
+      score += 0.1;
+      matchedSkills.push("question_answering");
+    }
+
+    // 复杂分析任务降低分数
+    if (content.includes("分析") && content.includes("包括") && content.length > 50) {
+      score -= 0.2;
+      matchedSkills.push("complex_analysis");
+    }
+
+    return {
+      score: Math.min(1, Math.max(0, score)),
+      matchedSkills,
+      reasoning:
+        matchedSkills.length > 0
+          ? `Matched skills: ${matchedSkills.join(", ")}`
+          : "General purpose handler",
+    };
+  }
+
+  /**
+   * 等待共识达成
+   */
+  private async waitForConsensus(
+    taskId: string,
+    timeout: number,
+  ): Promise<{
+    action: "direct" | "decompose";
+    assignedAgent?: string;
+    subtasks?: unknown[];
+  } | null> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        resolve(null);
+      }, timeout);
+
+      const handler = (event: Event) => {
+        if (event.type === "CONSENSUS_REACHED") {
+          const consensus = event.payload as ConsensusReached;
+          if (consensus.taskId === taskId) {
+            clearTimeout(timer);
+            this.eventBus.unsubscribe("CONSENSUS_REACHED", handler);
+            resolve(consensus.result);
+          }
+        }
+      };
+
+      this.eventBus.subscribe("CONSENSUS_REACHED", handler);
+    });
+  }
+
+  /**
+   * 发布响应
+   */
+  private async publishResponse(
+    message: Message,
+    content: string,
+    correlationId?: string,
+  ): Promise<void> {
+    const response: AgentResponse = {
+      messageId: message.id,
+      content,
+      agentId: this.id,
+      timestamp: Date.now(),
+    };
+
+    await this.eventBus.publish({
+      type: EventType.MESSAGE_PROCESSED,
+      sourceAgent: this.id,
+      payload: response,
+      correlationId,
+    });
+
+    console.log(`[InterfaceAgent ${this.id}] Response published:`, content.substring(0, 50));
   }
 
   /**
@@ -378,7 +523,7 @@ export class InterfaceAgent extends BaseAgent {
       reasons.push("length > 100 chars");
     }
 
-    // 2. Keyword analysis for complex tasks
+    // 2. Keyword analysis for complex tasks (English + Chinese)
     const complexKeywords = [
       "analyze",
       "generate",
@@ -404,6 +549,34 @@ export class InterfaceAgent extends BaseAgent {
       "large",
       "comprehensive",
       "complete",
+      // Chinese keywords
+      "分析",
+      "生成",
+      "创建",
+      "开发",
+      "构建",
+      "实现",
+      "首先",
+      "然后",
+      "最后",
+      "下一步",
+      "步骤",
+      "测试",
+      "文档",
+      "安全",
+      "漏洞",
+      "错误",
+      "多",
+      "阶段",
+      "复杂",
+      "大型",
+      "全面",
+      "完整",
+      "展开",
+      "详细",
+      "深入",
+      "比较",
+      "评估",
     ];
 
     const foundKeywords = complexKeywords.filter((keyword) =>
@@ -429,8 +602,21 @@ export class InterfaceAgent extends BaseAgent {
       reasons.push("multi-step instructions detected");
     }
 
-    // 4. Domain complexity (multiple domains)
-    const domains = ["security", "testing", "documentation", "frontend", "backend", "database"];
+    // 4. Domain complexity (multiple domains) - English + Chinese
+    const domains = [
+      "security",
+      "testing",
+      "documentation",
+      "frontend",
+      "backend",
+      "database",
+      "安全",
+      "测试",
+      "文档",
+      "前端",
+      "后端",
+      "数据库",
+    ];
     const foundDomains = domains.filter((domain) => content.includes(domain.toLowerCase()));
 
     if (foundDomains.length >= 2) {
@@ -450,23 +636,48 @@ export class InterfaceAgent extends BaseAgent {
       reasons.push("special complexity marker");
     }
 
+    // 7. Additional Chinese complexity indicators
+    const chineseComplexPatterns = [
+      "展开分析",
+      "详细分析",
+      "深入分析",
+      "比较分析",
+      "并生成",
+      "然后部署",
+      "同时监控",
+      "第一步",
+      "第二步",
+      "第三步",
+    ];
+    const hasChineseComplexPattern = chineseComplexPatterns.some((pattern) =>
+      content.includes(pattern.toLowerCase()),
+    );
+    if (hasChineseComplexPattern) {
+      complexityScore += 3;
+      reasons.push("complex Chinese pattern detected");
+    }
+
     // Determine task type based on content
     let taskType = "message";
-    if (content.includes("analyze") && content.includes("code")) {
+    if ((content.includes("analyze") || content.includes("分析")) && content.includes("code")) {
       taskType = "code_analysis";
-    } else if (content.includes("test") || content.includes("testing")) {
+    } else if (content.includes("test") || content.includes("测试")) {
       taskType = "testing_task";
-    } else if (content.includes("document") || content.includes("api")) {
+    } else if (content.includes("document") || content.includes("文档")) {
       taskType = "documentation";
     } else if (hasMultiStep || foundDomains.length >= 2) {
       taskType = "multi_phase";
     }
 
-    // Decision threshold
+    // Decision threshold - log the decision
     const shouldDelegate =
       complexityScore >= 6 ||
       metadata.force_delegation === true ||
       (complexityScore >= 4 && this.hiveConfig.agents.functional.enabled);
+
+    console.log(
+      `[InterfaceAgent ${this.id}] Task complexity analysis: score=${complexityScore}, threshold=6, shouldDelegate=${shouldDelegate}, functionalEnabled=${this.hiveConfig.agents.functional.enabled}`,
+    );
 
     return {
       shouldDelegate,

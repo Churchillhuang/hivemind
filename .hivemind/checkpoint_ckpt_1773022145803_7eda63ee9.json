@@ -1,0 +1,19 @@
+{
+  "id": "ckpt_1773022145803_7eda63ee9",
+  "timestamp": 1773022145804,
+  "state": "processing",
+  "stateHash": "2wj7ncx",
+  "checksum": "t4n",
+  "metadata": {
+    "activeAgents": [],
+    "pendingTasks": 0,
+    "completedTasks": 0,
+    "eventHistorySize": 0,
+    "generation": 0
+  },
+  "snapshots": {
+    "agents": "[]",
+    "tasks": "{\"pending\":0,\"completed\":0,\"failed\":0}",
+    "events": "[]"
+  }
+}

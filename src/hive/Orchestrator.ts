@@ -142,6 +142,11 @@ export class Orchestrator extends BaseAgent {
    * 判断使用哪种路由模式
    */
   private getRoutingMode(taskType: string): RoutingMode {
+    // 委托的任务总是使用协商路由
+    if (taskType.startsWith("delegated_") || taskType.includes("delegated")) {
+      return RoutingMode.NEGOTIATED;
+    }
+
     if (this.directRoutingTasks.has(taskType) || this.routingRules.has(taskType)) {
       return RoutingMode.DIRECT;
     }
@@ -454,20 +459,27 @@ export class Orchestrator extends BaseAgent {
    * 处理任务请求
    */
   async handleTaskRequest(event: Event): Promise<void> {
+    console.log(
+      `[Orchestrator ${this.id}] Handling TASK_REQUESTED:`,
+      (event.payload as { taskId?: string })?.taskId,
+    );
+
     const task: Task = {
       id: `task_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 9)}`,
       type: "action",
       priority: "medium",
       sourceAgent: event.sourceAgent,
-      payload: event.payload,
+      payload: event.payload as Record<string, unknown>,
       createdAt: Date.now(),
       status: "pending",
     };
 
     this.taskQueue.set(task.id, task);
+    console.log(`[Orchestrator ${this.id}] Task created: ${task.id}`);
 
     // 混合路由决策
     const decision = this.makeRoutingDecision(task);
+    console.log(`[Orchestrator ${this.id}] Routing decision:`, decision.reasoning);
     await this.executeRoutingDecision(decision);
   }
 
@@ -475,7 +487,15 @@ export class Orchestrator extends BaseAgent {
    * 混合路由决策
    */
   private makeRoutingDecision(task: Task): RoutingDecision {
-    const taskType = task.payload.taskType || (task.type as string);
+    const taskType = (task.payload?.taskType as string) || (task.type as string);
+    const taskId = task.id;
+
+    // 委托的任务总是使用协商路由
+    if (taskId.startsWith("task_") && task.payload?.taskId?.toString().startsWith("delegated_")) {
+      console.log(`[Orchestrator ${this.id}] Delegated task detected, using negotiated routing`);
+      return this.makeNegotiatedRoutingDecision(task, taskType);
+    }
+
     const routingMode = this.getRoutingMode(taskType);
 
     if (routingMode === RoutingMode.DIRECT) {

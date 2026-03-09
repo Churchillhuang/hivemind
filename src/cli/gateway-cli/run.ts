@@ -10,20 +10,20 @@ import {
   resolveGatewayPort,
 } from "../../config/config.js";
 import type { OpenClawConfig } from "../../config/types.js";
+import { EventBus, getGlobalEventBus } from "../../events/EventBus.js";
 import { resolveGatewayAuth } from "../../gateway/auth.js";
 import { startGatewayServer } from "../../gateway/server.js";
 import type { GatewayWsLogStyle } from "../../gateway/ws-logging.js";
 import { setGatewayWsLogStyle } from "../../gateway/ws-logging.js";
 import { setVerbose } from "../../globals.js";
+import type { HiveConfig } from "../../hive/HiveConfig.js";
+import { DEFAULT_HIVE_CONFIG } from "../../hive/HiveConfig.js";
+import { HiveManager } from "../../hive/HiveManager.js";
 import { GatewayLockError } from "../../infra/gateway-lock.js";
 import { formatPortDiagnostics, inspectPortUsage } from "../../infra/ports.js";
 import { setConsoleSubsystemFilter, setConsoleTimestampPrefix } from "../../logging/console.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { defaultRuntime } from "../../runtime.js";
-import { EventBus, getGlobalEventBus } from "../../events/EventBus.js";
-import type { HiveConfig } from "../../hive/HiveConfig.js";
-import { DEFAULT_HIVE_CONFIG } from "../../hive/HiveConfig.js";
-import { HiveManager } from "../../hive/HiveManager.js";
 import { formatCliCommand } from "../command-format.js";
 import { inheritOptionFromParent } from "../command-options.js";
 import { forceFreePortAndWait } from "../ports.js";
@@ -104,6 +104,7 @@ function parseEnvBool(raw: string | undefined): boolean {
 
 function resolveHiveRuntimeConfig(opts: GatewayRunOpts, cfg: OpenClawConfig): HiveConfig | null {
   const hiveConfigFromFile = cfg.gateway?.hive;
+  const gatewayAuthToken = cfg.gateway?.auth?.token;
   const hiveCliEnabled = Boolean(opts.hive);
   const enabled =
     hiveCliEnabled ||
@@ -135,6 +136,9 @@ function resolveHiveRuntimeConfig(opts: GatewayRunOpts, cfg: OpenClawConfig): Hi
   config.memory.indexing.workspacePath = workspacePath;
   config.memory.indexing.memoryPath = path.join(workspacePath, "memory");
   config.stateMachine.checkpointPath = path.join(workspacePath, ".hivemind", "state.json");
+  if (gatewayAuthToken) {
+    config.gateway.token = gatewayAuthToken;
+  }
   return config;
 }
 

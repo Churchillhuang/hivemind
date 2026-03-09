@@ -84,7 +84,7 @@ export class GatewayIntegrator {
           try {
             await this.onConnected();
             settle();
-          } catch (error) {
+          } catch {
             settle(error instanceof Error ? error : new Error(String(error)));
           }
         },
@@ -132,8 +132,13 @@ export class GatewayIntegrator {
    * 处理 Gateway 事件
    */
   async handleEvent(event: EventFrame): Promise<void> {
+    console.log(
+      `[GatewayIntegrator] Received event: ${event.event}`,
+      JSON.stringify(event.payload).substring(0, 200),
+    );
     const bridge = await this.resolveBridge();
     if (!bridge.isHiveEnabled()) {
+      console.log(`[GatewayIntegrator] Hive not enabled, skipping event`);
       return;
     }
     await this.routeGatewayEvent(event, bridge);
@@ -185,7 +190,7 @@ export class GatewayIntegrator {
         message: response.content,
         metadata: response.metadata,
       });
-    } catch (error) {
+    } catch {
       console.error("[GatewayIntegrator] Error processing message:", error);
     }
   }
@@ -242,7 +247,95 @@ export class GatewayIntegrator {
   private async onConnected(): Promise<void> {
     const bridge = await this.resolveBridge();
     await bridge.initialize();
-    console.log("[GatewayIntegrator] Connection established");
+
+    // Note: BACKEND mode receives health/tick events but not chat.send
+    // Use polling to fetch chat messages
+    this.startMessagePolling(bridge);
+
+    console.log("[GatewayIntegrator] Connection established (BACKEND mode with polling)");
+  }
+
+  private lastMessageId: string | null = null; // Reset to process all messages
+  private pollInterval: NodeJS.Timeout | null = null;
+
+  private startMessagePolling(bridge: HiveGatewayBridge): void {
+    const pollChatMessages = async () => {
+      if (!this.connected) {
+        return;
+      }
+      try {
+        // Poll for messages on the default agent session
+        const result = await this.sendRequest<{
+          messages?: Array<unknown>;
+        }>("chat.history", { sessionKey: "agent:main:main", limit: 10 });
+
+        if (result?.messages && result.messages.length > 0) {
+          // Process messages in reverse order (oldest first)
+          const messages = [...result.messages].toReversed();
+          for (const msg of messages) {
+            const msgObj = msg as {
+              role?: string;
+              content?: Array<{ type: string; text?: string }>;
+              timestamp?: number;
+            };
+
+            // Only process user messages (inbound)
+            if (msgObj.role === "user") {
+              // Extract text from content array
+              const textContent = msgObj.content?.find((c) => c.type === "text");
+              const text = textContent?.text;
+
+              if (text && msgObj.timestamp) {
+                const msgId = `msg_${msgObj.timestamp}`;
+                if (msgId !== this.lastMessageId) {
+                  console.log(
+                    `[GatewayIntegrator] New chat message:`,
+                    msgId,
+                    text.substring(0, 30),
+                  );
+                  await this.handleChatMessage(
+                    { id: msgId, message: { text }, userId: "user" },
+                    bridge,
+                  );
+                  this.lastMessageId = msgId;
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // Silently ignore polling errors - they happen when no session exists
+      }
+    };
+
+    // Poll every 2 seconds
+    this.pollInterval = setInterval(pollChatMessages, 2000);
+    // Initial poll
+    void pollChatMessages();
+  }
+
+  private async handleChatMessage(
+    msg: { id: string; message?: { text?: string }; userId?: string },
+    _bridge: HiveGatewayBridge,
+  ): Promise<void> {
+    const content = msg.message?.text;
+    if (!content) {
+      return;
+    }
+
+    // Publish message to event bus for InterfaceAgent to process
+    await this.config.eventBus.publish({
+      type: EventType.NEW_MESSAGE,
+      sourceAgent: "GatewayIntegrator",
+      payload: {
+        message: {
+          id: msg.id,
+          content,
+          userId: msg.userId,
+          channelId: "default",
+        },
+      },
+    });
   }
 
   private async resolveBridge(): Promise<HiveGatewayBridge> {

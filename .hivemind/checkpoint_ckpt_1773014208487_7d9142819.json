@@ -1,0 +1,26 @@
+{
+  "id": "ckpt_1773014208487_7d9142819",
+  "timestamp": 1773014208488,
+  "state": "idle",
+  "stateHash": "4u8357g",
+  "checksum": "110q",
+  "metadata": {
+    "activeAgents": [
+      "orchestrator_001",
+      "interface_agent_001",
+      "memory_agent_001",
+      "memory_gateway_001",
+      "reflection_agent_001",
+      "agent_factory_001"
+    ],
+    "pendingTasks": 0,
+    "completedTasks": 0,
+    "eventHistorySize": 11,
+    "generation": 0
+  },
+  "snapshots": {
+    "agents": "[\"orchestrator_001\",\"interface_agent_001\",\"memory_agent_001\",\"memory_gateway_001\",\"reflection_agent_001\",\"agent_factory_001\"]",
+    "tasks": "{\"pending\":0,\"completed\":0,\"failed\":0}",
+    "events": "[{\"id\":\"evt_1773014018418_0\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_gateway_001\",\"timestamp\":1773014018418},{\"id\":\"evt_1773014018424_1\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1773014018424},{\"id\":\"evt_1773014018436_2\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1773014018436},{\"id\":\"evt_1773014018440_3\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1773014018440},{\"id\":\"evt_1773014018446_4\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"reflection_agent_001\",\"timestamp\":1773014018446},{\"id\":\"evt_1773014018458_5\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"agent_factory_001\",\"timestamp\":1773014018458},{\"id\":\"evt_1773014018502_6\",\"type\":\"SYSTEM_START\",\"sourceAgent\":\"HiveManager\",\"timestamp\":1773014018502},{\"id\":\"evt_1773014018505_7\",\"type\":\"HIVE_BRIDGE_INITIALIZED\",\"sourceAgent\":\"HiveGatewayBridge\",\"timestamp\":1773014018505},{\"id\":\"evt_1773014078447_8\",\"type\":\"SELF_REFLECTION\",\"sourceAgent\":\"reflection_agent_001\",\"timestamp\":1773014078447},{\"id\":\"evt_1773014138447_9\",\"type\":\"SELF_REFLECTION\",\"sourceAgent\":\"reflection_agent_001\",\"timestamp\":1773014138447},{\"id\":\"evt_1773014198447_10\",\"type\":\"SELF_REFLECTION\",\"sourceAgent\":\"reflection_agent_001\",\"timestamp\":1773014198447}]"
+  }
+}

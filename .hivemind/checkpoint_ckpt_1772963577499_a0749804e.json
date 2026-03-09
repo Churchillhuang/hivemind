@@ -1,0 +1,26 @@
+{
+  "id": "ckpt_1772963577499_a0749804e",
+  "timestamp": 1772963577500,
+  "state": "shutdown",
+  "stateHash": "bu07cee",
+  "checksum": "113s",
+  "metadata": {
+    "activeAgents": [
+      "orchestrator_001",
+      "interface_agent_001",
+      "memory_agent_001",
+      "memory_gateway_001",
+      "reflection_agent_001",
+      "agent_factory_001"
+    ],
+    "pendingTasks": 0,
+    "completedTasks": 0,
+    "eventHistorySize": 9,
+    "generation": 0
+  },
+  "snapshots": {
+    "agents": "[\"orchestrator_001\",\"interface_agent_001\",\"memory_agent_001\",\"memory_gateway_001\",\"reflection_agent_001\",\"agent_factory_001\"]",
+    "tasks": "{\"pending\":0,\"completed\":0,\"failed\":0}",
+    "events": "[{\"id\":\"evt_1772963576490_0\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_gateway_001\",\"timestamp\":1772963576490},{\"id\":\"evt_1772963576491_1\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1772963576491},{\"id\":\"evt_1772963576492_2\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1772963576492},{\"id\":\"evt_1772963576492_3\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772963576492},{\"id\":\"evt_1772963576492_4\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"reflection_agent_001\",\"timestamp\":1772963576492},{\"id\":\"evt_1772963576493_5\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"agent_factory_001\",\"timestamp\":1772963576493},{\"id\":\"evt_1772963576497_6\",\"type\":\"SYSTEM_START\",\"sourceAgent\":\"HiveManager\",\"timestamp\":1772963576497},{\"id\":\"evt_1772963576498_7\",\"type\":\"TASK_REQUEST\",\"sourceAgent\":\"test_runner\",\"timestamp\":1772963576498},{\"id\":\"evt_1772963576498_8\",\"type\":\"TASK_REQUEST\",\"sourceAgent\":\"test_runner\",\"timestamp\":1772963576498}]"
+  }
+}

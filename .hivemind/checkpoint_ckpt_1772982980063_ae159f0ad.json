@@ -1,0 +1,26 @@
+{
+  "id": "ckpt_1772982980063_ae159f0ad",
+  "timestamp": 1772982980063,
+  "state": "shutdown",
+  "stateHash": "649wrni",
+  "checksum": "112w",
+  "metadata": {
+    "activeAgents": [
+      "orchestrator_001",
+      "interface_agent_001",
+      "memory_agent_001",
+      "memory_gateway_001",
+      "reflection_agent_001",
+      "agent_factory_001"
+    ],
+    "pendingTasks": 1,
+    "completedTasks": 0,
+    "eventHistorySize": 14,
+    "generation": 0
+  },
+  "snapshots": {
+    "agents": "[\"orchestrator_001\",\"interface_agent_001\",\"memory_agent_001\",\"memory_gateway_001\",\"reflection_agent_001\",\"agent_factory_001\"]",
+    "tasks": "{\"pending\":1,\"completed\":0,\"failed\":0}",
+    "events": "[{\"id\":\"evt_1772982973048_0\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_gateway_001\",\"timestamp\":1772982973048},{\"id\":\"evt_1772982973049_1\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1772982973049},{\"id\":\"evt_1772982973050_2\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1772982973050},{\"id\":\"evt_1772982973050_3\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772982973050},{\"id\":\"evt_1772982973050_4\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"reflection_agent_001\",\"timestamp\":1772982973050},{\"id\":\"evt_1772982973051_5\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"agent_factory_001\",\"timestamp\":1772982973051},{\"id\":\"evt_1772982973056_6\",\"type\":\"SYSTEM_START\",\"sourceAgent\":\"HiveManager\",\"timestamp\":1772982973056},{\"id\":\"evt_1772982973056_7\",\"type\":\"HIVE_BRIDGE_INITIALIZED\",\"sourceAgent\":\"HiveGatewayBridge\",\"timestamp\":1772982973056},{\"id\":\"evt_1772982973058_8\",\"type\":\"TASK_REQUESTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772982973058},{\"id\":\"evt_1772982973058_9\",\"type\":\"TASK_ANNOUNCEMENT\",\"sourceAgent\":\"NegotiationRouter\",\"timestamp\":1772982973058},{\"id\":\"evt_1772982973058_10\",\"type\":\"TASK_BID\",\"sourceAgent\":\"func_1772982973058_5jnn8zk\",\"timestamp\":1772982973058},{\"id\":\"evt_1772982973059_11\",\"type\":\"AGENT_CREATED\",\"sourceAgent\":\"agent_factory_001\",\"timestamp\":1772982973059},{\"id\":\"evt_1772982978063_12\",\"type\":\"TASK_ASSIGNED\",\"sourceAgent\":\"NegotiationRouter\",\"timestamp\":1772982978063},{\"id\":\"evt_1772982978064_13\",\"type\":\"TASK_ASSIGNED\",\"sourceAgent\":\"Orchestrator\",\"timestamp\":1772982978064}]"
+  }
+}

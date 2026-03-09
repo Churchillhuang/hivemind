@@ -1,0 +1,26 @@
+{
+  "id": "ckpt_1772962061091_39223d1ab",
+  "timestamp": 1772962061091,
+  "state": "shutdown",
+  "stateHash": "3hx46g7",
+  "checksum": "111z",
+  "metadata": {
+    "activeAgents": [
+      "orchestrator_001",
+      "interface_agent_001",
+      "memory_agent_001",
+      "memory_gateway_001",
+      "reflection_agent_001",
+      "agent_factory_001"
+    ],
+    "pendingTasks": 0,
+    "completedTasks": 0,
+    "eventHistorySize": 13,
+    "generation": 0
+  },
+  "snapshots": {
+    "agents": "[\"orchestrator_001\",\"interface_agent_001\",\"memory_agent_001\",\"memory_gateway_001\",\"reflection_agent_001\",\"agent_factory_001\"]",
+    "tasks": "{\"pending\":0,\"completed\":0,\"failed\":0}",
+    "events": "[{\"id\":\"evt_1772962061079_0\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_gateway_001\",\"timestamp\":1772962061079},{\"id\":\"evt_1772962061080_1\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1772962061080},{\"id\":\"evt_1772962061082_2\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1772962061082},{\"id\":\"evt_1772962061082_3\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772962061082},{\"id\":\"evt_1772962061082_4\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"reflection_agent_001\",\"timestamp\":1772962061082},{\"id\":\"evt_1772962061083_5\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"agent_factory_001\",\"timestamp\":1772962061083},{\"id\":\"evt_1772962061087_6\",\"type\":\"SYSTEM_START\",\"sourceAgent\":\"HiveManager\",\"timestamp\":1772962061087},{\"id\":\"evt_1772962061088_7\",\"type\":\"HIVE_BRIDGE_INITIALIZED\",\"sourceAgent\":\"HiveGatewayBridge\",\"timestamp\":1772962061088},{\"id\":\"evt_1772962061088_8\",\"type\":\"NEW_MESSAGE\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772962061088,\"correlationId\":\"multi_step_complex_task\"},{\"id\":\"evt_1772962061088_9\",\"type\":\"TASK_ASSIGNED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1772962061088},{\"id\":\"evt_1772962061089_10\",\"type\":\"MEMORY_QUERY\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772962061089},{\"id\":\"evt_1772962061090_11\",\"type\":\"MEMORY_RESULT\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1772962061090},{\"id\":\"evt_1772962061090_12\",\"type\":\"MESSAGE_PROCESSED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772962061090}]"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "ckpt_1772967275940_dcea150d5",
+  "timestamp": 1772967275940,
+  "state": "shutdown",
+  "stateHash": "5xcfzb2",
+  "checksum": "113c",
+  "metadata": {
+    "activeAgents": [
+      "orchestrator_001",
+      "interface_agent_001",
+      "memory_agent_001",
+      "memory_gateway_001",
+      "reflection_agent_001",
+      "agent_factory_001"
+    ],
+    "pendingTasks": 2,
+    "completedTasks": 0,
+    "eventHistorySize": 20,
+    "generation": 0
+  },
+  "snapshots": {
+    "agents": "[\"orchestrator_001\",\"interface_agent_001\",\"memory_agent_001\",\"memory_gateway_001\",\"reflection_agent_001\",\"agent_factory_001\"]",
+    "tasks": "{\"pending\":2,\"completed\":0,\"failed\":0}",
+    "events": "[{\"id\":\"evt_1772967274922_0\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_gateway_001\",\"timestamp\":1772967274922},{\"id\":\"evt_1772967274923_1\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1772967274923},{\"id\":\"evt_1772967274924_2\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1772967274924},{\"id\":\"evt_1772967274925_3\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772967274925},{\"id\":\"evt_1772967274926_4\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"reflection_agent_001\",\"timestamp\":1772967274926},{\"id\":\"evt_1772967274926_5\",\"type\":\"AGENT_STARTED\",\"sourceAgent\":\"agent_factory_001\",\"timestamp\":1772967274926},{\"id\":\"evt_1772967274931_6\",\"type\":\"SYSTEM_START\",\"sourceAgent\":\"HiveManager\",\"timestamp\":1772967274931},{\"id\":\"evt_1772967274931_7\",\"type\":\"HIVE_BRIDGE_INITIALIZED\",\"sourceAgent\":\"HiveGatewayBridge\",\"timestamp\":1772967274931},{\"id\":\"evt_1772967274932_8\",\"type\":\"NEW_MESSAGE\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772967274932,\"correlationId\":\"simple_test\"},{\"id\":\"evt_1772967274932_9\",\"type\":\"TASK_ASSIGNED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1772967274932},{\"id\":\"evt_1772967274933_10\",\"type\":\"MEMORY_QUERY\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772967274933},{\"id\":\"evt_1772967274933_11\",\"type\":\"MEMORY_RESULT\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1772967274933},{\"id\":\"evt_1772967274934_12\",\"type\":\"MESSAGE_PROCESSED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772967274934},{\"id\":\"evt_1772967274935_13\",\"type\":\"TASK_REQUESTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772967274935},{\"id\":\"evt_1772967274936_14\",\"type\":\"TASK_ANNOUNCEMENT\",\"sourceAgent\":\"NegotiationRouter\",\"timestamp\":1772967274936},{\"id\":\"evt_1772967274937_15\",\"type\":\"TASK_REQUESTED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772967274937},{\"id\":\"evt_1772967274937_16\",\"type\":\"TASK_ASSIGNED\",\"sourceAgent\":\"orchestrator_001\",\"timestamp\":1772967274937},{\"id\":\"evt_1772967274937_17\",\"type\":\"MEMORY_QUERY\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772967274937},{\"id\":\"evt_1772967274937_18\",\"type\":\"MEMORY_RESULT\",\"sourceAgent\":\"memory_agent_001\",\"timestamp\":1772967274937},{\"id\":\"evt_1772967274938_19\",\"type\":\"MESSAGE_PROCESSED\",\"sourceAgent\":\"interface_agent_001\",\"timestamp\":1772967274938}]"
+  }
+}

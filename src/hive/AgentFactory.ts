@@ -9,6 +9,7 @@ import { BaseAgent } from "../core/Agent.js";
 import { Event, EventType } from "../events/Event.js";
 import { EventBus } from "../events/EventBus.js";
 import type { HiveConfig } from "../hive/HiveConfig.js";
+import { FunctionalAgent } from "./FunctionalAgent.js";
 import { SkillPersistence } from "./SkillPersistence.js";
 
 /**
@@ -66,6 +67,9 @@ export class AgentFactory extends BaseAgent {
     }
   > = new Map();
   private skillPersistence: SkillPersistence;
+
+  // 实际的功能Agent实例
+  private functionalAgents: Map<string, FunctionalAgent> = new Map();
 
   constructor(
     config: { id: string; role: string; description?: string },
@@ -216,7 +220,7 @@ export class AgentFactory extends BaseAgent {
   }
 
   /**
-   * 处理任务公告 - 创建匹配的代理并让其投标
+   * 处理任务公告 - 检查现有Agent池或创建新Agent
    */
   private async handleTaskAnnouncement(event: Event): Promise<void> {
     const announcement = event.payload as {
@@ -232,7 +236,41 @@ export class AgentFactory extends BaseAgent {
       `[AgentFactory ${this.id}] Task announcement received: ${announcement.taskId} (${announcement.taskType})`,
     );
 
-    // 1. 查找匹配的模板
+    // 1. 检查现有Agent池中是否有匹配的
+    const activeAgents = Array.from(this.functionalAgents.entries());
+    const matchingAgents = activeAgents.filter(([id]) => {
+      const instance = this.instances.get(id);
+      if (!instance || instance.status !== "active") {
+        return false;
+      }
+      // 检查能力是否匹配
+      const hasCapability = announcement.requiredCapabilities.some(
+        (cap) =>
+          instance.capabilities.includes(cap) ||
+          instance.capabilities.some(
+            (c: string) =>
+              c.toLowerCase().includes(cap.toLowerCase()) ||
+              cap.toLowerCase().includes(c.toLowerCase()),
+          ),
+      );
+      return hasCapability;
+    });
+
+    console.log(`[AgentFactory ${this.id}] Found ${matchingAgents.length} matching agents in pool`);
+
+    // 2. 如果有匹配的Agent，让它们自己处理（它们已经订阅了TASK_ANNOUNCEMENT）
+    if (matchingAgents.length > 0) {
+      console.log(
+        `[AgentFactory ${this.id}] Using existing agent pool - agents will evaluate and dance autonomously`,
+      );
+      // 不需要做任何事，现有的FunctionalAgent会自动收到TASK_ANNOUNCEMENT事件
+      // 它们会评估、发布舞蹈、参与共识
+      return;
+    }
+
+    // 3. 如果没有匹配的，查找模板创建新Agent
+    console.log(`[AgentFactory ${this.id}] No matching agents in pool, creating new one`);
+
     const matchingTemplate = this.findMatchingTemplate(
       announcement.taskType,
       announcement.requiredCapabilities,
@@ -250,7 +288,7 @@ export class AgentFactory extends BaseAgent {
       return;
     }
 
-    // 2. 为任务创建代理
+    // 4. 为任务创建代理
     await this.createAgentForTask(matchingTemplate, announcement);
   }
 
@@ -288,7 +326,7 @@ export class AgentFactory extends BaseAgent {
   }
 
   /**
-   * 为任务创建代理并让其投标
+   * 为任务创建代理并让其参与共识
    */
   private async createAgentForTask(template: AgentTemplate, announcement: unknown): Promise<void> {
     const taskAnnouncement = announcement as {
@@ -301,12 +339,32 @@ export class AgentFactory extends BaseAgent {
     };
     const instanceId = `func_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    // 创建代理实例
+    // 创建真实的功能Agent实例
+    const functionalAgent = new FunctionalAgent(
+      {
+        instanceId,
+        role: template.role,
+        description: template.description,
+        capabilities: template.capabilities,
+        templateId: template.id,
+        taskId: taskAnnouncement.taskId,
+      },
+      this.hiveConfig,
+      this.eventBus,
+    );
+
+    // 启动功能Agent（它会订阅共识相关事件）
+    await functionalAgent.start();
+
+    // 存储实例
+    this.functionalAgents.set(instanceId, functionalAgent);
+
+    // 创建代理实例记录
     const agentInstance: AgentInstance = {
       ...template,
       instanceId,
       createdAt: Date.now(),
-      status: "creating",
+      status: "active",
       performance: {
         tasksCompleted: 0,
         tasksFailed: 0,
@@ -317,23 +375,16 @@ export class AgentFactory extends BaseAgent {
     this.instances.set(instanceId, agentInstance);
 
     console.log(
-      `[AgentFactory ${this.id}] Created agent ${instanceId} for task ${taskAnnouncement.taskId}`,
+      `[AgentFactory ${this.id}] Created functional agent ${instanceId} for task ${taskAnnouncement.taskId}`,
     );
+    console.log(
+      `[AgentFactory ${this.id}] Agent ${instanceId} capabilities: ${template.capabilities.join(", ")}`,
+    );
+    console.log(`[AgentFactory ${this.id}] Agent ${instanceId} is listening for consensus events`);
 
-    // 让新代理立即投标
-    await this.eventBus.publish({
-      type: "TASK_BID",
-      sourceAgent: instanceId,
-      payload: {
-        taskId: taskAnnouncement.taskId,
-        agentId: instanceId,
-        capabilities: template.capabilities,
-        estimatedTimeMs: 5000, // 默认5秒
-        currentLoad: 0, // 新代理负载为0
-        bidScore: 0.1, // 新代理有优势（低分优先）
-        timestamp: Date.now(),
-      },
-    });
+    // 重要：让新创建的Agent立即处理这个任务公告
+    // 因为Agent是在事件发布后才创建的，它错过了原始事件
+    await functionalAgent.handleTaskAnnouncement(taskAnnouncement as TaskAnnouncement);
 
     // 发布代理创建事件
     await this.eventBus.publish({
@@ -347,6 +398,33 @@ export class AgentFactory extends BaseAgent {
         capabilities: template.capabilities,
       },
     });
+  }
+
+  /**
+   * 计算Agent与任务的匹配度
+   */
+  private calculateMatchScore(
+    template: AgentTemplate,
+    task: { requiredCapabilities: string[]; description: string },
+  ): number {
+    let score = 0.5; // 基础分数
+
+    // 1. 能力匹配
+    const matchedCapabilities = template.capabilities.filter((cap) =>
+      task.requiredCapabilities.includes(cap),
+    );
+    if (matchedCapabilities.length > 0) {
+      score += 0.3 * (matchedCapabilities.length / Math.max(template.capabilities.length, 1));
+    }
+
+    // 2. 描述关键词匹配
+    const desc = task.description.toLowerCase();
+    const keywordMatches = template.capabilities.filter((cap) => desc.includes(cap.toLowerCase()));
+    if (keywordMatches.length > 0) {
+      score += 0.2;
+    }
+
+    return Math.min(1, score);
   }
 
   /**
@@ -468,8 +546,31 @@ export class AgentFactory extends BaseAgent {
       }
     }
 
-    // 模拟创建延迟（实际应该是实例化真正的 Agent 类）
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // 如果是functional agent，创建真正的FunctionalAgent实例
+    if (template.type === "functional") {
+      const functionalAgent = new FunctionalAgent(
+        {
+          instanceId,
+          role: template.role,
+          description: template.description,
+          capabilities: template.capabilities,
+          templateId: template.id,
+          taskId: request.taskId,
+        },
+        this.hiveConfig,
+        this.eventBus,
+      );
+
+      // 启动functional agent（它会订阅TASK_ANNOUNCEMENT等事件）
+      await functionalAgent.start();
+
+      // 存储到functionalAgents map
+      this.functionalAgents.set(instanceId, functionalAgent);
+
+      console.log(
+        `[AgentFactory ${this.id}] FunctionalAgent ${instanceId} started and listening for events`,
+      );
+    }
 
     instance.status = "active";
 
@@ -519,6 +620,14 @@ export class AgentFactory extends BaseAgent {
     }
 
     instance.status = "destroying";
+
+    // 停止并移除功能Agent实例
+    const functionalAgent = this.functionalAgents.get(instanceId);
+    if (functionalAgent) {
+      await functionalAgent.stop();
+      this.functionalAgents.delete(instanceId);
+      console.log(`[AgentFactory ${this.id}] Functional agent ${instanceId} stopped`);
+    }
 
     // 检查生命周期
     if (instance.lifespan === "task" && !instance.currentTaskId) {
